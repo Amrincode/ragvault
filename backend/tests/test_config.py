@@ -6,7 +6,12 @@ from pydantic import ValidationError
 from app.core.config import Settings
 
 
-def test_environment_overrides_dotenv(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+@pytest.mark.parametrize("password_override", [None, "environment-password"])
+def test_environment_overrides_dotenv(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, password_override: str | None
+) -> None:
+    monkeypatch.delenv("POSTGRES_PASSWORD", raising=False)
+    monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
     env_file = tmp_path / ".env"
     env_file.write_text(
         "POSTGRES_PASSWORD=file-password\nBACKEND_PORT=8001\n"
@@ -14,9 +19,11 @@ def test_environment_overrides_dotenv(monkeypatch: pytest.MonkeyPatch, tmp_path:
         encoding="utf-8",
     )
     monkeypatch.setenv("BACKEND_PORT", "9000")
+    if password_override is not None:
+        monkeypatch.setenv("POSTGRES_PASSWORD", password_override)
     config = Settings(_env_file=env_file)
     assert config.backend_port == 9000
-    assert config.postgres_password.get_secret_value() == "file-password"
+    assert config.postgres_password.get_secret_value() == (password_override or "file-password")
     assert config.ollama_base_url.host == "host.docker.internal"
 
 
