@@ -11,8 +11,10 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import api_error
 from app.db.session import get_session
-from app.models import Collection, Document
+from app.models import Collection, Document, DocumentChunk
 from app.schemas.library import (
+    ChunkPage,
+    ChunkResponse,
     CollectionName,
     CollectionResponse,
     DocumentName,
@@ -27,11 +29,53 @@ from app.services.library import (
     save_collection,
     upload_document,
 )
+from app.services.processing import PdfProcessor, get_processor, process_document
 from app.services.storage import DocumentStorage, get_storage
 
 router = APIRouter(prefix="/api", tags=["library"])
 DB = Annotated[Session, Depends(get_session)]
 Storage = Annotated[DocumentStorage, Depends(get_storage)]
+Processor = Annotated[PdfProcessor, Depends(get_processor)]
+
+
+@router.post("/documents/{document_id}/process", response_model=DocumentResponse)
+def process_pdf(document_id: UUID, session: DB, storage: Storage, processor: Processor) -> Document:
+    return process_document(session, storage, processor, document_id)
+
+
+@router.get("/documents/{document_id}/processing", response_model=DocumentResponse)
+def processing_status(document_id: UUID, session: DB) -> Document:
+    return require_document(session, document_id)
+
+
+@router.get("/documents/{document_id}/chunks", response_model=ChunkPage)
+def list_chunks(
+    document_id: UUID,
+    session: DB,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    page_number: Annotated[int | None, Query(ge=1)] = None,
+) -> ChunkPage:
+    document = require_document(session, document_id)
+    if document.processing_status not in {"processed", "no_text"}:
+        raise api_error(
+            409,
+            "text_unavailable",
+            "Process this document successfully before inspecting its chunks",
+        )
+    statement = select(DocumentChunk).where(DocumentChunk.document_id == document_id)
+    if page_number is not None:
+        statement = statement.where(DocumentChunk.page_number == page_number)
+    total = session.scalar(select(func.count()).select_from(statement.subquery())) or 0
+    rows = session.scalars(
+        statement.order_by(DocumentChunk.chunk_index).offset(offset).limit(limit)
+    )
+    return ChunkPage(
+        items=[ChunkResponse.model_validate(c) for c in rows],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
 
 def collection_response(session: Session, collection: Collection) -> CollectionResponse:

@@ -96,6 +96,12 @@ def upload_document(
 
 def delete_document(session: Session, storage: DocumentStorage, document_id: UUID) -> None:
     document = require_document(session, document_id, lock=True)
+    if document.processing_status == "processing":
+        raise api_error(
+            409,
+            "document_processing",
+            "Wait for processing to finish or recover an expired attempt before deleting",
+        )
     key = document.storage_key
     quarantined = None
     try:

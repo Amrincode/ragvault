@@ -17,6 +17,8 @@ vi.mock('../lib/api', () => ({
   renameDocument: vi.fn(),
   deleteDocument: vi.fn(),
   getDocumentPDF: vi.fn(),
+  processDocument: vi.fn(),
+  listDocumentChunks: vi.fn(),
   documentDownloadUrl: (id: string) =>
     `/api/documents/${id}/file?download=true`,
 }))
@@ -73,6 +75,32 @@ beforeEach(() => {
 })
 
 describe('document library', () => {
+  it('processes an uploaded document and refreshes its status', async () => {
+    const user = userEvent.setup()
+    mount()
+    await screen.findByRole('button', { name: 'Process document paper.pdf' })
+    const processed = {
+      ...document,
+      processing_status: 'processed' as const,
+      page_count: 2,
+      chunk_count: 3,
+    }
+    vi.mocked(api.processDocument).mockResolvedValue(processed)
+    vi.mocked(api.listDocuments).mockResolvedValue({
+      items: [processed],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    })
+    await user.click(
+      screen.getByRole('button', { name: 'Process document paper.pdf' }),
+    )
+    expect(await screen.findByText('Processed')).toBeInTheDocument()
+    expect(screen.getByText('3 chunks · 2 pages')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Inspect text' }),
+    ).toBeInTheDocument()
+  })
   it('creates a collection through the dialog', async () => {
     const user = userEvent.setup()
     mount()

@@ -1,5 +1,9 @@
 # Milestone 2: local PDF document library
 
+This document records the Milestone 2 baseline. Milestone 3 extends its uploaded-only
+status and adds processing, chunks and lifecycle safety; see [PDF processing](pdf-processing.md)
+for the current processing architecture. Upload validation still performs no text extraction.
+
 RAGVault is a **single-user, local-only application**. It has no authentication or tenant isolation. Keep the API, frontend, PostgreSQL, and Ollama bound to the local machine; do not expose this milestone publicly.
 
 ```mermaid

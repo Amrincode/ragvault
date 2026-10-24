@@ -17,6 +17,15 @@ export function useLibrary(collectionId: string | null, offset: number) {
   const reload = useCallback(() => setVersion((value) => value + 1), [])
 
   useEffect(() => {
+    if (
+      !documents.items.some((item) => item.processing_status === 'processing')
+    )
+      return
+    const interval = window.setInterval(reload, 2000)
+    return () => window.clearInterval(interval)
+  }, [documents.items, reload])
+
+  useEffect(() => {
     const controller = new AbortController()
     const timer = window.setTimeout(() => {
       setLoading(true)

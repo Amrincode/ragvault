@@ -4,6 +4,7 @@ import type {
   Document,
   DocumentPage,
   LibraryConfig,
+  ChunkPage,
 } from '../types/library'
 
 export const apiBaseUrl = (
@@ -37,7 +38,7 @@ async function libraryRequest(
     ...options,
     cache: 'no-store',
     signal: AbortSignal.any([
-      AbortSignal.timeout(120_000),
+      AbortSignal.timeout(path.endsWith('/process') ? 240_000 : 120_000),
       ...(options.signal ? [options.signal] : []),
     ]),
     headers: {
@@ -116,6 +117,19 @@ export const renameDocument = (id: string, filename: string) =>
     method: 'PATCH',
     body: JSON.stringify({ filename }),
   })
+export const processDocument = (id: string) =>
+  jsonRequest<Document>(`/api/documents/${id}/process`, { method: 'POST' })
+export const getProcessingStatus = (id: string, signal?: AbortSignal) =>
+  jsonRequest<Document>(`/api/documents/${id}/processing`, { signal })
+export const listDocumentChunks = (
+  id: string,
+  offset = 0,
+  signal?: AbortSignal,
+) =>
+  jsonRequest<ChunkPage>(
+    `/api/documents/${id}/chunks?limit=20&offset=${offset}`,
+    { signal },
+  )
 export async function deleteDocument(id: string): Promise<void> {
   await libraryRequest(`/api/documents/${id}`, { method: 'DELETE' })
 }

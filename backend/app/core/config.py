@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import AnyHttpUrl, Field, SecretStr, field_validator
+from pydantic import AnyHttpUrl, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
 
@@ -36,6 +36,18 @@ class Settings(BaseSettings):
     max_upload_bytes: int = Field(default=25 * 1024 * 1024, ge=1024, le=1024 * 1024 * 1024)
     max_pdf_pages: int = Field(default=2000, ge=1, le=10000)
     pdf_validation_timeout_seconds: int = Field(default=15, ge=1, le=60)
+    chunk_size_chars: int = Field(default=1200, ge=128, le=8000)
+    chunk_overlap_chars: int = Field(default=200, ge=0, le=2000)
+    processing_timeout_seconds: int = Field(default=60, ge=5, le=180)
+    max_page_text_chars: int = Field(default=100_000, ge=1000, le=500_000)
+    max_extracted_chars: int = Field(default=1_000_000, ge=1000, le=5_000_000)
+    max_document_chunks: int = Field(default=5000, ge=1, le=10_000)
+
+    @model_validator(mode="after")
+    def validate_chunking(self) -> "Settings":
+        if self.chunk_overlap_chars >= self.chunk_size_chars:
+            raise ValueError("Chunk overlap must be smaller than chunk size")
+        return self
 
     @field_validator("upload_dir")
     @classmethod

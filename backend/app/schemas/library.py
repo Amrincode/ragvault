@@ -70,7 +70,38 @@ class DocumentResponse(TimestampedResponse):
     file_size: int
     mime_type: Literal["application/pdf"]
     checksum: str
-    processing_status: Literal["uploaded"]
+    processing_status: Literal["uploaded", "processing", "processed", "failed", "no_text"]
+    processing_started_at: datetime | None = None
+    processed_at: datetime | None = None
+    processing_error: str | None = None
+    page_count: int | None = None
+    chunk_count: int = 0
+    chunk_size_chars: int | None = None
+    chunk_overlap_chars: int | None = None
+
+    @field_validator("processing_started_at", "processed_at")
+    @classmethod
+    def processing_timezone(cls, value: datetime | None) -> datetime | None:
+        return value.replace(tzinfo=UTC) if value is not None and value.tzinfo is None else value
+
+
+class ChunkResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    document_id: UUID
+    page_number: int
+    chunk_index: int
+    text: str
+    start_char: int
+    end_char: int
+    created_at: datetime
+
+
+class ChunkPage(BaseModel):
+    items: list[ChunkResponse]
+    total: int
+    limit: int
+    offset: int
 
 
 class DocumentPage(BaseModel):

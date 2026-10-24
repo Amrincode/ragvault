@@ -2,13 +2,15 @@
 
 A local-first document intelligence portfolio project, built in explicit milestones.
 
-**Current milestone: 2 — PDF Document Management.** Organize collections, upload validated PDFs, browse and paginate documents, preview original pages, rename, download, and delete files. The dashboard still reports FastAPI, PostgreSQL, and Ollama health.
+**Current milestone: 3 — PDF Text Extraction and Chunking.** Organize collections, upload validated PDFs, preview originals, and process documents into page-aware text chunks. Inspect extracted text, retry failures, reprocess, rename, download and delete files. The dashboard still reports FastAPI, PostgreSQL, and Ollama health.
 
-**Single user. Local machine only. No authentication. Do not expose this service publicly.** PDF text extraction, OCR, chunking, embeddings, pgvector retrieval, RAG, AI chat, and background processing are not implemented.
+**Single user. Local machine only. No authentication. Do not expose this service publicly.** OCR, embeddings, pgvector retrieval, RAG, AI chat, and background queues are not implemented.
 
 ![Document library](docs/screenshots/document-library.png)
 
-See [architecture and consistency decisions](docs/architecture/document-library.md), [Milestone 2 verification](docs/verification-milestone-2.md), and the [historical Milestone 1 report](docs/verification.md).
+![Page-aware text inspector](docs/screenshots/text-chunks.png)
+
+See [PDF processing architecture](docs/architecture/pdf-processing.md), [Milestone 3 verification](docs/verification-milestone-3.md), [document-library foundations](docs/architecture/document-library.md), [Milestone 2 verification](docs/verification-milestone-2.md), and the [historical Milestone 1 report](docs/verification.md).
 
 ## Stack
 
@@ -32,11 +34,40 @@ flowchart LR
 - Collections use UUIDs, trimmed names up to 120 characters, UTC timestamps, and case-insensitive unique names. Only empty collections can be deleted; otherwise the API returns 409.
 - Documents have UUIDs, collection relationships, display names, internal UUID storage keys, byte sizes, fixed PDF MIME, SHA-256 checksums, status, and UTC timestamps. Internal paths are not exposed by metadata responses.
 - Identical bytes in the same collection return 409, even with another filename. The same PDF in another collection is allowed and stored independently. Rename preserves bytes and checksum.
-- The only successful status is `uploaded`. Rejected uploads return an error and leave no failed document row. Uploaded does not mean extracted, embedded, indexed, or RAG-ready.
+- Uploads start as `uploaded`. Explicit processing transitions through `processing` to `processed`, `no_text` or `failed`. Retry and reprocessing replace chunks atomically. No status means embedded, indexed or RAG-ready.
 - Upload validation checks extension, safe display name, byte limit, PDF header, PyMuPDF structure/repair state, encryption, and page count. Client MIME is ignored. Path components from upload filenames are discarded; rename inputs reject path separators and control characters.
 - The browser offers accessible dialogs, file selection and drag/drop, a clear uploading indicator, loading/empty/error states, collection filtering, pagination, confirmation before deletion, and a local PDF.js page preview. Original download remains available.
 
-## Windows setup or upgrade from Milestone 1
+## Text processing and inspection
+
+Use **Process document** in the library. Processing is synchronous and bounded; it does
+not run automatically during upload. PyMuPDF reads stored PDFs page by page, normalizes
+whitespace and produces character-based chunks within individual pages. The inspector
+shows one-based PDF page numbers and paginated source text rendered as plain text.
+Image-only PDFs finish as **No extractable text**; OCR is not included.
+
+Defaults are 1,200 characters per chunk with up to 200 characters of overlap, a
+60-second parser timeout, 100,000 raw characters per page, 1,000,000 raw characters per
+document and 5,000 chunks. Set `CHUNK_SIZE_CHARS`, `CHUNK_OVERLAP_CHARS`,
+`PROCESSING_TIMEOUT_SECONDS`, `MAX_PAGE_TEXT_CHARS`, `MAX_EXTRACTED_CHARS` and
+`MAX_DOCUMENT_CHUNKS` in your existing `.env` only if you want different limits.
+Overlap must be smaller than chunk size. Character counts are not model token counts.
+
+- `POST /api/documents/{id}/process`: process, retry or replace an extraction.
+- `GET /api/documents/{id}/processing`: current lifecycle metadata.
+- `GET /api/documents/{id}/chunks?limit=20&offset=0`: deterministic ordered chunks,
+  optionally filtered with `page_number`; maximum page size is 100.
+
+Reprocessing first invalidates old chunks, then atomically commits all replacement
+chunks with the final status. Failures retain the original PDF and a safe retry message.
+Only one parser runs per API process. Active duplicate attempts and deletion while
+processing return 409. A claim interrupted by a crash can be retried after the timeout
+plus 60 seconds; use **Retry expired processing** or the same process endpoint.
+Paragraph/layout detection is heuristic, chunks do not cross pages, and no OCR, embeddings,
+search, model execution or AI chat is performed. See the architecture for resource limits,
+restart behavior and future pgvector integration.
+
+## Windows setup or upgrade from earlier milestones
 
 Prerequisites: Python 3.12+, Node.js 24 with npm, Git, Docker Desktop with Linux containers/Compose, and optionally running Ollama for a completely healthy dashboard. The tested workstation uses Python 3.12.10 and Node 24.16.0. No new Ollama models are needed.
 
@@ -59,7 +90,7 @@ Set-Location backend
 .\.venv\Scripts\python.exe -m alembic check
 ```
 
-Expect PostgreSQL to become healthy, revision `0001_document_library (head)`, and `No new upgrade operations detected.` Startup never creates tables or runs migrations automatically. The migration adds `collections` and `documents`; it does not reset the database.
+Expect PostgreSQL to become healthy, revision `0002_document_processing (head)`, and `No new upgrade operations detected.` Startup never creates tables or runs migrations automatically. The new additive migration extends document statuses and adds `document_chunks`; it preserves existing collections, documents, PDFs and database volumes.
 
 Start the backend in one terminal:
 
@@ -81,7 +112,7 @@ The `predev` and `prebuild` scripts copy PDF.js fonts, character maps, and codec
 
 ## Configuration
 
-Both apps read the root `.env`; shell environment values take precedence. Existing Milestone 1 configuration continues to work. New settings have defaults and do not require overwriting `.env`.
+Both apps read the root `.env`; shell environment values take precedence. Existing configuration continues to work. New settings have defaults and do not require overwriting `.env`.
 
 | Setting | Default / behavior |
 | --- | --- |
@@ -145,7 +176,7 @@ Upload failures roll back metadata and clean up staged/promoted files. Duplicate
 
 SQL and files cannot form one atomic transaction. Hard crashes, ambiguous commits, or disk/recovery failures can leave files requiring operator reconciliation; no startup routine automatically deletes them. Quarantined filenames retain their storage keys for recovery. Back up PostgreSQL and the upload directory together with writers stopped. If Windows blocks a move while another client is downloading, deletion returns an error and can be retried after that download ends.
 
-PDF validation is not malware scanning, content sanitization, or proof of safety. Files remain untrusted; the parser subprocess has a timeout but no OS memory/CPU sandbox or reduced filesystem privileges. Upload storage is not encrypted by the app. Preview is one page at a time with a bounded canvas; original-file streaming does not offer range/resume support. There is no authentication, OCR, full-text search, extraction, chunking, embedding, retrieval, or AI chat.
+PDF validation is not malware scanning, content sanitization, or proof of safety. Files remain untrusted; the parser subprocess has a timeout but no OS memory/CPU sandbox or reduced filesystem privileges. Upload storage is not encrypted by the app. Preview is one page at a time with a bounded canvas; original-file streaming does not offer range/resume support. There is no authentication, OCR, full-text search, embedding, retrieval, or AI chat. Extraction has additional timeout, page/text/output/concurrency limits; the Linux child has a 1 GiB address-space ceiling. Windows transient page memory is not hard-capped. See the processing architecture for details.
 
 ## Tests and quality checks
 
@@ -187,11 +218,11 @@ The same URLs apply. Backend storage is `/app/data/uploads`, bind-mounted from `
 - `backend/app/api`: health, collection, document, file-serving, and public-limit routes.
 - `backend/app/models`, `schemas`, `services`: SQLAlchemy metadata, validation/response schemas, file storage, and transactional library operations.
 - `backend/app/core`: settings, structured logging, upload-body bounds, and local browser-origin enforcement.
-- `backend/alembic`: the explicit `0001_document_library` migration.
+- `backend/alembic`: the explicit library and page-aware processing migrations.
 - `backend/tests`: isolated health/configuration, collection/document CRUD, PDF validation, cleanup, persistence, and failure tests.
 - `frontend/src/pages`: overview and document library; `features/documents`: dialogs and lazy PDF renderer.
 - `frontend/src/lib`, `hooks`, `types`: typed API client, state/loading/cancellation, and shared types.
 - `frontend/scripts/copy-pdf-assets.mjs`: local preview resource preparation.
 - `docs/architecture`, `docs/screenshots`: current design and actual verification captures.
 
-The root `.env`, virtual environments, data/uploads, caches, build output, generated PDF.js resources, and local `.artifacts` are ignored. `.env.example`, source, migrations, tests, package lockfile, documentation, and screenshots belong in Git. No Milestone 2 commit or push is created automatically.
+The root `.env`, virtual environments, data/uploads, caches, build output, generated PDF.js resources, and local `.artifacts` are ignored. `.env.example`, source, migrations, tests, package lockfile, documentation, and screenshots belong in Git. No Milestone 3 commit or push is created without approval.

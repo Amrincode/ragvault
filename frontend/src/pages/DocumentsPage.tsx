@@ -10,6 +10,10 @@ import {
 import { formatBytes } from '../lib/format'
 import { useLibrary } from '../hooks/useLibrary'
 import {
+  ProcessingActions,
+  ProcessingStatus,
+} from '../features/documents/ProcessingActions'
+import {
   createCollection,
   deleteCollection,
   deleteDocument,
@@ -173,7 +177,7 @@ export function DocumentsPage() {
               </button>
             </div>
           )}
-          {loading ? (
+          {loading && !documents.items.length ? (
             <div
               role="status"
               className="rounded-xl border border-line bg-white py-16 text-center text-sm text-muted"
@@ -237,9 +241,7 @@ export function DocumentsPage() {
                         <span>
                           {new Date(item.created_at).toLocaleDateString()}
                         </span>
-                        <span className="rounded bg-emerald-50 px-2 py-0.5 text-emerald-800">
-                          Uploaded
-                        </span>
+                        <ProcessingStatus document={item} />
                       </div>
                       <p
                         className="mt-2 font-mono text-[9px] text-muted"
@@ -247,6 +249,7 @@ export function DocumentsPage() {
                       >
                         SHA-256 {item.checksum.slice(0, 12)}…
                       </p>
+                      <ProcessingActions document={item} onChanged={reload} />
                     </div>
                     <div className="flex w-full flex-wrap gap-3 pl-15 text-xs sm:w-auto sm:pl-0">
                       <button
@@ -362,7 +365,7 @@ export function DocumentsPage() {
       {dialog?.type === 'deleteDocument' && (
         <DeleteDialog
           title="Delete document?"
-          description={`Permanently delete “${dialog.item.filename}” and its stored PDF? This cannot be undone.`}
+          description={`Permanently delete “${dialog.item.filename}”, its stored PDF, and extracted chunks? This cannot be undone.`}
           onClose={close}
           onConfirm={async () => {
             await deleteDocument(dialog.item.id)

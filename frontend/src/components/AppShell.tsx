@@ -68,7 +68,7 @@ export function AppShell({
             Running on your machine.
           </p>
           <p className="mt-6 font-mono text-[10px] text-white/30">
-            v0.2.0 · LOCAL LIBRARY
+            v0.3.0 · LOCAL LIBRARY
           </p>
         </div>
       </aside>
@@ -78,7 +78,7 @@ export function AppShell({
           <span className="font-medium text-ink">{page}</span>
         </div>
         <span className="rounded-full border border-line bg-white px-3 py-1.5 text-[11px] font-medium text-muted">
-          Milestone 02
+          Milestone 03
         </span>
       </header>
       <main id="main" className="mx-auto max-w-7xl px-6 py-9 lg:px-10 lg:py-11">

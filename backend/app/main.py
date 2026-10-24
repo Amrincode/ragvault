@@ -17,6 +17,7 @@ from app.core.origin import LibraryOriginMiddleware
 from app.core.upload_limit import UploadLimitMiddleware
 from app.db.session import build_engine
 from app.services.ollama import OllamaClient
+from app.services.processing import PdfProcessor
 from app.services.storage import DocumentStorage
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.engine = engine
         app.state.settings = config
         app.state.storage = DocumentStorage(config)
+        app.state.processor = PdfProcessor(config)
         try:
             with httpx.Client(
                 base_url=str(config.ollama_base_url).rstrip("/") + "/",
@@ -45,7 +47,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             engine.dispose()
             logger.info("RAGVault stopped")
 
-    app = FastAPI(title="RAGVault API", version="0.2.0", lifespan=lifespan)
+    app = FastAPI(title="RAGVault API", version="0.3.0", lifespan=lifespan)
     app.add_middleware(UploadLimitMiddleware, max_bytes=config.max_upload_bytes)
     app.add_middleware(
         LibraryOriginMiddleware,

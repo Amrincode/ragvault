@@ -66,7 +66,7 @@ export function DashboardPage() {
           <div className="relative">
             <span className="inline-flex items-center gap-2 text-[10px] font-semibold tracking-[0.18em] text-mint">
               <span className="size-1.5 rounded-full bg-mint" />
-              MILESTONE 02 · PDF DOCUMENT MANAGEMENT
+              MILESTONE 03 · PDF TEXT PROCESSING
             </span>
             <h2 className="mt-4 text-xl font-medium tracking-tight">
               A home for your original documents.
@@ -74,8 +74,8 @@ export function DashboardPage() {
             <p className="mt-2 max-w-xl text-sm leading-6 text-white/60">
               Organize PDFs into collections, preview originals, and manage your
               library locally.
-              <br className="hidden sm:block" /> Text extraction and AI
-              conversations remain planned.
+              <br className="hidden sm:block" /> Extract page-aware text chunks.
+              AI conversations remain planned.
             </p>
             <div className="mt-6 inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-xs text-mint">
               <Icon name="check" className="size-3.5" />
