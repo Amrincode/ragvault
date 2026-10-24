@@ -1,0 +1,60 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-forest: #122d31;
+  --color-mint: #b9e6c9;
+  --color-canvas: #f7f8f6;
+  --color-ink: #203537;
+  --color-muted: #6b7879;
+  --color-line: #e4e9e5;
+  --font-sans: 'Segoe UI', ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    margin: 0;
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button {
+    cursor: pointer;
+  }
+  :focus-visible {
+    outline: 2px solid #31856a;
+    outline-offset: 4px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  .nav-item {
+    @apply flex items-center gap-3 rounded-lg px-3 py-3 text-xs font-medium transition;
+  }
+  .nav-soon {
+    @apply ml-auto hidden rounded border border-white/15 px-1.5 py-0.5 text-[9px] font-normal text-white/40 sm:block;
+  }
+  .eyebrow {
+    @apply text-[10px] font-semibold tracking-[0.18em] text-muted;
+  }
+  .planned-badge {
+    @apply rounded-md border border-line bg-canvas px-2 py-1 text-[10px] font-medium text-muted;
+  }
+}
