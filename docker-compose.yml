@@ -28,6 +28,9 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       OLLAMA_BASE_URL: ${OLLAMA_DOCKER_BASE_URL:-http://host.docker.internal:11434}
+      UPLOAD_DIR: /app/data/uploads
+    volumes:
+      - ./data/uploads:/app/data/uploads
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     depends_on:

@@ -3,6 +3,7 @@ import { Icon, type IconName } from '../components/Icon'
 import { StatusBadge } from '../components/StatusBadge'
 import { useHealth } from '../hooks/useHealth'
 import { apiBaseUrl } from '../lib/api'
+import { Link } from 'react-router'
 
 export function DashboardPage() {
   const { data, error, checking, checkedAt, refresh } = useHealth()
@@ -41,7 +42,7 @@ export function DashboardPage() {
           <div>
             <p className="eyebrow">YOUR LOCAL INTELLIGENCE WORKSPACE</p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-              A foundation for knowledge.
+              Your knowledge, close at hand.
             </h1>
             <p className="mt-3 max-w-xl text-sm leading-6 text-muted">
               Welcome to RAGVault. Your document intelligence workspace
@@ -65,20 +66,20 @@ export function DashboardPage() {
           <div className="relative">
             <span className="inline-flex items-center gap-2 text-[10px] font-semibold tracking-[0.18em] text-mint">
               <span className="size-1.5 rounded-full bg-mint" />
-              MILESTONE 01 · PROJECT FOUNDATION
+              MILESTONE 02 · PDF DOCUMENT MANAGEMENT
             </span>
             <h2 className="mt-4 text-xl font-medium tracking-tight">
-              Good intelligence starts with good infrastructure.
+              A home for your original documents.
             </h2>
             <p className="mt-2 max-w-xl text-sm leading-6 text-white/60">
-              The application shell and service health checks are ready to
-              verify.
-              <br className="hidden sm:block" /> Document processing and AI
-              conversations come in later milestones.
+              Organize PDFs into collections, preview originals, and manage your
+              library locally.
+              <br className="hidden sm:block" /> Text extraction and AI
+              conversations remain planned.
             </p>
             <div className="mt-6 inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-xs text-mint">
               <Icon name="check" className="size-3.5" />
-              Foundation scope only
+              Single-user · Local-only
             </div>
           </div>
         </div>
@@ -177,9 +178,9 @@ export function DashboardPage() {
             id="workspace-heading"
             className="text-base font-semibold text-ink"
           >
-            Your workspace, taking shape
+            Your workspace
           </h2>
-          <span className="text-xs text-muted">Coming in later milestones</span>
+          <span className="text-xs text-muted">Built in milestones</span>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <article
@@ -188,15 +189,22 @@ export function DashboardPage() {
           >
             <div className="flex items-center justify-between">
               <Icon name="documents" className="size-6 text-forest" />
-              <span className="planned-badge">Planned</span>
+              <span className="rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-800">
+                Available
+              </span>
             </div>
             <h3 className="mt-5 font-semibold text-ink">Documents</h3>
             <p className="mt-2 max-w-sm text-sm leading-6 text-muted">
-              A place for your knowledge. PDF uploads, processing, and document
-              organization will be added later.
+              Create collections, upload validated PDFs, preview originals,
+              rename files, and manage your local library.
             </p>
             <p className="mt-5 border-t border-line pt-4 text-xs text-muted">
-              Document management is not implemented yet.
+              <Link
+                to="/documents"
+                className="font-semibold text-forest hover:underline"
+              >
+                Open document library →
+              </Link>
             </p>
           </article>
           <article

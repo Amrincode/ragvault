@@ -67,3 +67,16 @@ def test_password_is_required(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("POSTGRES_PASSWORD", raising=False)
     with pytest.raises(ValidationError):
         Settings(_env_file=None)
+
+
+def test_upload_directory_is_relative_to_repository() -> None:
+    from app.core.config import ROOT_ENV_FILE
+
+    config = Settings(_env_file=None, postgres_password="test", upload_dir="data/custom")
+    assert config.upload_dir == ROOT_ENV_FILE.parent / "data/custom"
+
+
+@pytest.mark.parametrize("field", ["max_upload_bytes", "max_pdf_pages"])
+def test_upload_limits_must_be_positive(field: str) -> None:
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, postgres_password="test", **{field: 0})

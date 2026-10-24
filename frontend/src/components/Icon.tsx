@@ -1,6 +1,8 @@
 import type { CSSProperties } from 'react'
 
 const paths = {
+  plus: 'M12 5v14M5 12h14',
+  upload: 'M12 16V3m-5 5 5-5 5 5M4 16v5h16v-5',
   vault: 'm12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Zm-8 4.5 8 4.5 8-4.5M12 12v9',
   dashboard: 'M3 3h7v7H3V3Zm11 0h7v7h-7V3ZM3 14h7v7H3v-7Zm11 0h7v7h-7v-7Z',
   documents:

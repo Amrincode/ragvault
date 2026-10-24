@@ -1,5 +1,7 @@
 # Milestone 1 architecture
 
+This document records the committed Milestone 1 design. The current library architecture and security boundaries are documented in [Milestone 2](document-library.md).
+
 ```mermaid
 flowchart LR
     subgraph Browser

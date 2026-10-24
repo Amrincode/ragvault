@@ -32,6 +32,16 @@ class Settings(BaseSettings):
     ollama_embedding_model: str = "nomic-embed-text"
     ollama_timeout_seconds: float = Field(default=3.0, gt=0, le=30)
 
+    upload_dir: Path = ROOT_ENV_FILE.parent / "data" / "uploads"
+    max_upload_bytes: int = Field(default=25 * 1024 * 1024, ge=1024, le=1024 * 1024 * 1024)
+    max_pdf_pages: int = Field(default=2000, ge=1, le=10000)
+    pdf_validation_timeout_seconds: int = Field(default=15, ge=1, le=60)
+
+    @field_validator("upload_dir")
+    @classmethod
+    def resolve_upload_dir(cls, value: Path) -> Path:
+        return value if value.is_absolute() else ROOT_ENV_FILE.parent / value
+
     @field_validator("frontend_origin")
     @classmethod
     def validate_origin(cls, value: AnyHttpUrl) -> AnyHttpUrl:

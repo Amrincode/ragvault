@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -13,8 +14,13 @@ from app.services.ollama import OllamaClient, get_ollama
 
 
 @pytest.fixture
-def settings() -> Settings:
-    return Settings(_env_file=None, app_env="test", postgres_password="test-only-password")
+def settings(tmp_path: Path) -> Settings:
+    return Settings(
+        _env_file=None,
+        app_env="test",
+        postgres_password="test-only-password",
+        upload_dir=tmp_path / "uploads",
+    )
 
 
 @pytest.fixture

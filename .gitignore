@@ -40,3 +40,4 @@ Desktop.ini
 
 # Local verification artifacts
 .artifacts/
+frontend/public/pdfjs/

@@ -5,7 +5,7 @@ WORKDIR /app
 
 COPY pyproject.toml ./
 COPY app ./app
-RUN pip install --no-cache-dir . && useradd --create-home ragvault
+RUN pip install --no-cache-dir . && useradd --create-home ragvault && mkdir -p /app/data/uploads && chown -R ragvault:ragvault /app/data
 COPY alembic.ini ./
 COPY alembic ./alembic
 

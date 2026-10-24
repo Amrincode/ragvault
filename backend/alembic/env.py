@@ -4,11 +4,11 @@ from alembic import context
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.db.base import Base
+from app.models import Collection, Document  # noqa: F401
 
 settings = get_settings()
 configure_logging(settings.log_level)
 target_metadata = Base.metadata
-# Import future model modules here so autogenerate can see their tables.
 
 
 def run_migrations_offline() -> None:
