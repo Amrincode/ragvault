@@ -1,4 +1,5 @@
 import { isHealthResponse, type HealthResponse } from '../types/health'
+import type { SearchInput, SearchResponse } from '../types/search'
 import type {
   Collection,
   Document,
@@ -38,7 +39,13 @@ async function libraryRequest(
     ...options,
     cache: 'no-store',
     signal: AbortSignal.any([
-      AbortSignal.timeout(path.endsWith('/process') ? 240_000 : 120_000),
+      AbortSignal.timeout(
+        path.endsWith('/index')
+          ? 660_000
+          : path.endsWith('/process')
+            ? 240_000
+            : 120_000,
+      ),
       ...(options.signal ? [options.signal] : []),
     ]),
     headers: {
@@ -119,6 +126,27 @@ export const renameDocument = (id: string, filename: string) =>
   })
 export const processDocument = (id: string) =>
   jsonRequest<Document>(`/api/documents/${id}/process`, { method: 'POST' })
+export const indexDocument = (id: string) =>
+  jsonRequest<Document>(`/api/documents/${id}/index`, { method: 'POST' })
+export const getIndexingStatus = (id: string, signal?: AbortSignal) =>
+  jsonRequest<Document>(`/api/documents/${id}/indexing`, { signal })
+export const getDocument = (id: string, signal?: AbortSignal) =>
+  jsonRequest<Document>(`/api/documents/${id}`, { signal })
+export function listSearchDocuments(
+  collectionId: string | null,
+  offset = 0,
+  signal?: AbortSignal,
+) {
+  const params = new URLSearchParams({ limit: '100', offset: String(offset) })
+  if (collectionId) params.set('collection_id', collectionId)
+  return jsonRequest<DocumentPage>(`/api/documents?${params}`, { signal })
+}
+export const searchPassages = (body: SearchInput, signal?: AbortSignal) =>
+  jsonRequest<SearchResponse>('/api/search', {
+    method: 'POST',
+    body: JSON.stringify(body),
+    signal,
+  })
 export const getProcessingStatus = (id: string, signal?: AbortSignal) =>
   jsonRequest<Document>(`/api/documents/${id}/processing`, { signal })
 export const listDocumentChunks = (

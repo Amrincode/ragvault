@@ -42,6 +42,15 @@ class Settings(BaseSettings):
     max_page_text_chars: int = Field(default=100_000, ge=1000, le=500_000)
     max_extracted_chars: int = Field(default=1_000_000, ge=1000, le=5_000_000)
     max_document_chunks: int = Field(default=5000, ge=1, le=10_000)
+    embedding_timeout_seconds: int = Field(default=60, ge=2, le=180)
+    indexing_timeout_seconds: int = Field(default=180, ge=10, le=600)
+    embedding_batch_size: int = Field(default=16, ge=1, le=32)
+    max_index_chunks: int = Field(default=2000, ge=1, le=5000)
+    max_index_vector_values: int = Field(default=2_000_000, ge=1, le=10_000_000)
+    max_embedding_dimensions: int = Field(default=4096, ge=1, le=16000)
+    embedding_document_prefix: str = Field(default="search_document: ", max_length=128)
+    embedding_query_prefix: str = Field(default="search_query: ", max_length=128)
+    search_top_k: int = Field(default=5, ge=1, le=20)
 
     @model_validator(mode="after")
     def validate_chunking(self) -> "Settings":

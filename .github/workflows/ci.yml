@@ -17,7 +17,7 @@ jobs:
       POSTGRES_PASSWORD: ci-only-password
     services:
       postgres:
-        image: postgres:17-alpine
+        image: pgvector/pgvector:0.8.7-pg17
         env:
           POSTGRES_DB: ragvault
           POSTGRES_USER: ragvault
@@ -44,6 +44,10 @@ jobs:
       - run: python -m alembic check
       - name: Check real PostgreSQL connectivity
         run: python -c "from app.core.config import get_settings; from app.db.session import build_engine, check_database; engine = build_engine(get_settings()); result = check_database(engine); engine.dispose(); assert result.status == 'connected', result"
+      - name: PostgreSQL vector integration tests
+        env:
+          RAGVAULT_TEST_POSTGRES: '1'
+        run: python -m pytest -m postgres
 
   frontend:
     runs-on: ubuntu-latest

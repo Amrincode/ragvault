@@ -318,9 +318,11 @@ export function UploadDialog({
 export function PreviewDialog({
   document,
   onClose,
+  initialPage = 1,
 }: {
   document: Document
   onClose: () => void
+  initialPage?: number
 }) {
   const [blob, setBlob] = useState<Blob | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -342,7 +344,7 @@ export function PreviewDialog({
   return (
     <Dialog title={document.filename} onClose={onClose} wide>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-xs text-muted">
-        <span>Original PDF · {formatBytes(document.file_size)} · Uploaded</span>
+        <span>Original PDF · {formatBytes(document.file_size)}</span>
         <a
           href={documentDownloadUrl(document.id)}
           className="secondary-button"
@@ -358,7 +360,11 @@ export function PreviewDialog({
         </p>
       ) : blob ? (
         <Suspense fallback={<p role="status">Loading PDF renderer…</p>}>
-          <PdfPreview blob={blob} filename={document.filename} />
+          <PdfPreview
+            blob={blob}
+            filename={document.filename}
+            initialPage={initialPage}
+          />
         </Suspense>
       ) : (
         <p role="status" className="py-16 text-center text-sm text-muted">

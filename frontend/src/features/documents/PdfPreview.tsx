@@ -9,9 +9,11 @@ import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 export default function PdfPreview({
   blob,
   filename,
+  initialPage = 1,
 }: {
   blob: Blob
   filename: string
+  initialPage?: number
 }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null)
@@ -35,7 +37,10 @@ export default function PdfPreview({
           wasmUrl: `${import.meta.env.BASE_URL}pdfjs/wasm/`,
         })
         const document = await task.promise
-        if (!cancelled) setPdf(document)
+        if (!cancelled) {
+          setPageNumber(Math.min(Math.max(1, initialPage), document.numPages))
+          setPdf(document)
+        }
       })
       .catch(() => {
         if (!cancelled)
@@ -47,7 +52,7 @@ export default function PdfPreview({
       cancelled = true
       if (task) void task.destroy()
     }
-  }, [blob])
+  }, [blob, initialPage])
 
   useEffect(() => {
     if (!pdf) return

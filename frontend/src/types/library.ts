@@ -22,6 +22,14 @@ export interface Document {
   chunk_count?: number
   chunk_size_chars?: number | null
   chunk_overlap_chars?: number | null
+  indexing_status?: 'not_indexed' | 'indexing' | 'indexed' | 'failed'
+  indexing_started_at?: string | null
+  indexed_at?: string | null
+  indexing_error?: string | null
+  indexed_chunk_count?: number
+  embedding_model?: string | null
+  embedding_digest?: string | null
+  embedding_dimensions?: number | null
   created_at: string
   updated_at: string
 }

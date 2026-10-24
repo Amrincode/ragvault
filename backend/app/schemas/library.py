@@ -78,8 +78,16 @@ class DocumentResponse(TimestampedResponse):
     chunk_count: int = 0
     chunk_size_chars: int | None = None
     chunk_overlap_chars: int | None = None
+    indexing_status: Literal["not_indexed", "indexing", "indexed", "failed"] = "not_indexed"
+    indexing_started_at: datetime | None = None
+    indexed_at: datetime | None = None
+    indexing_error: str | None = None
+    indexed_chunk_count: int = 0
+    embedding_model: str | None = None
+    embedding_digest: str | None = None
+    embedding_dimensions: int | None = None
 
-    @field_validator("processing_started_at", "processed_at")
+    @field_validator("processing_started_at", "processed_at", "indexing_started_at", "indexed_at")
     @classmethod
     def processing_timezone(cls, value: datetime | None) -> datetime | None:
         return value.replace(tzinfo=UTC) if value is not None and value.tzinfo is None else value

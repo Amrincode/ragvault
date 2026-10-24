@@ -154,7 +154,7 @@ export function ChunkInspector({
     >
       <p className="mb-4 text-xs text-muted">
         Text is untrusted source content. Page numbers match the original PDF.
-        No AI or OCR is used.
+        Extraction uses no AI or OCR.
       </p>
       {error ? (
         <p role="alert" className="error-message">

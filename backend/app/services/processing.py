@@ -133,6 +133,15 @@ def process_document(
                 processing_token=token,
                 processing_error=None,
                 processed_at=None,
+                indexing_status="not_indexed",
+                indexing_token=None,
+                indexing_error=None,
+                indexed_at=None,
+                indexed_chunk_count=0,
+                embedding_model=None,
+                embedding_digest=None,
+                embedding_dimensions=None,
+                embedding_fingerprint=None,
             )
         )
         if claim.rowcount != 1:

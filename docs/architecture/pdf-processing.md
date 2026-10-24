@@ -1,5 +1,10 @@
 # Milestone 3: page-aware PDF text processing
 
+This records the Milestone 3 processing baseline. Milestone 4 adds the separate
+[embedding and semantic-search lifecycle](semantic-search.md), including embedding
+invalidation when these chunks are replaced. Its future-feature statements refer to
+the original Milestone 3 scope; README and the new architecture describe current features.
+
 RAGVault remains a single-user application bound to the local machine. Text extraction
 and chunking are implemented. OCR, embeddings, vector search, retrieval and chat are planned.
 Ollama is still used only by health checks. No LangChain, LlamaIndex, queue service or

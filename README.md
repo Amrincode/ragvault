@@ -2,23 +2,23 @@
 
 A local-first document intelligence portfolio project, built in explicit milestones.
 
-**Current milestone: 3 — PDF Text Extraction and Chunking.** Organize collections, upload validated PDFs, preview originals, and process documents into page-aware text chunks. Inspect extracted text, retry failures, reprocess, rename, download and delete files. The dashboard still reports FastAPI, PostgreSQL, and Ollama health.
+**Current milestone: 4 — Semantic Search and Vector Embeddings.** Organize collections, upload validated PDFs, preview originals, and process documents into page-aware text chunks. Inspect extracted text, index existing chunks with local Ollama, and search original passages by meaning with document/collection filters. Rename, download, reprocess and delete remain available. The dashboard still reports FastAPI, PostgreSQL, and Ollama health.
 
-**Single user. Local machine only. No authentication. Do not expose this service publicly.** OCR, embeddings, pgvector retrieval, RAG, AI chat, and background queues are not implemented.
+**Single user. Local machine only. No authentication. Do not expose this service publicly.** Semantic passage search is implemented. OCR, RAG answers, AI chat, conversation history and background queues are not implemented.
 
 ![Document library](docs/screenshots/document-library.png)
 
 ![Page-aware text inspector](docs/screenshots/text-chunks.png)
 
-See [PDF processing architecture](docs/architecture/pdf-processing.md), [Milestone 3 verification](docs/verification-milestone-3.md), [document-library foundations](docs/architecture/document-library.md), [Milestone 2 verification](docs/verification-milestone-2.md), and the [historical Milestone 1 report](docs/verification.md).
+See [semantic search architecture](docs/architecture/semantic-search.md), [Milestone 4 verification](docs/verification-milestone-4.md), [PDF processing architecture](docs/architecture/pdf-processing.md), [Milestone 3 verification](docs/verification-milestone-3.md), [document-library foundations](docs/architecture/document-library.md), [Milestone 2 verification](docs/verification-milestone-2.md), and the [historical Milestone 1 report](docs/verification.md).
 
 ## Stack
 
-- Python 3.12+, FastAPI, Pydantic Settings, SQLAlchemy 2.x, psycopg, PostgreSQL 17, Alembic.
+- Python 3.12+, FastAPI, Pydantic Settings, SQLAlchemy 2.x, psycopg, PostgreSQL 17 with pgvector, Alembic.
 - PyMuPDF validates uploads; original PDFs live on disk rather than in PostgreSQL.
 - React, TypeScript, Vite, Tailwind CSS, React Router, and PDF.js preview.
 - Docker Compose, Pytest, Ruff, Vitest, React Testing Library, ESLint, Prettier, and GitHub Actions.
-- Ollama runs on Windows for connectivity checks only; models are not invoked in this milestone.
+- Ollama runs locally for health checks and `nomic-embed-text` embeddings. No chat model is invoked.
 
 ```mermaid
 flowchart LR
@@ -26,15 +26,17 @@ flowchart LR
     API --> DB[(PostgreSQL metadata)]
     API --> PDFs[Local PDF files]
     React --> Preview[PDF.js page preview]
-    API -->|Health only| Ollama[Windows Ollama]
+    API -->|Health and local embeddings| Ollama[Windows Ollama]
 ```
+
+![Semantic passage search](docs/screenshots/semantic-search.png)
 
 ## Features and policies
 
 - Collections use UUIDs, trimmed names up to 120 characters, UTC timestamps, and case-insensitive unique names. Only empty collections can be deleted; otherwise the API returns 409.
 - Documents have UUIDs, collection relationships, display names, internal UUID storage keys, byte sizes, fixed PDF MIME, SHA-256 checksums, status, and UTC timestamps. Internal paths are not exposed by metadata responses.
 - Identical bytes in the same collection return 409, even with another filename. The same PDF in another collection is allowed and stored independently. Rename preserves bytes and checksum.
-- Uploads start as `uploaded`. Explicit processing transitions through `processing` to `processed`, `no_text` or `failed`. Retry and reprocessing replace chunks atomically. No status means embedded, indexed or RAG-ready.
+- Uploads start as `uploaded`. Explicit processing transitions through `processing` to `processed`, `no_text` or `failed`. Retry and reprocessing replace chunks atomically. Processing status alone does not mean indexed; indexing has a separate lifecycle.
 - Upload validation checks extension, safe display name, byte limit, PDF header, PyMuPDF structure/repair state, encryption, and page count. Client MIME is ignored. Path components from upload filenames are discarded; rename inputs reject path separators and control characters.
 - The browser offers accessible dialogs, file selection and drag/drop, a clear uploading indicator, loading/empty/error states, collection filtering, pagination, confirmation before deletion, and a local PDF.js page preview. Original download remains available.
 
@@ -63,13 +65,45 @@ chunks with the final status. Failures retain the original PDF and a safe retry 
 Only one parser runs per API process. Active duplicate attempts and deletion while
 processing return 409. A claim interrupted by a crash can be retried after the timeout
 plus 60 seconds; use **Retry expired processing** or the same process endpoint.
-Paragraph/layout detection is heuristic, chunks do not cross pages, and no OCR, embeddings,
-search, model execution or AI chat is performed. See the architecture for resource limits,
-restart behavior and future pgvector integration.
+Paragraph/layout detection is heuristic, chunks do not cross pages, and no OCR or AI chat is performed. Embedding/indexing is a separate explicit action. See the processing architecture for resource limits and restart behavior.
+
+## Semantic passage search
+
+In Documents, first **Process document**, then **Index for search**. Indexing embeds stored
+chunks without reparsing the PDF. Open [Semantic search](http://localhost:5173/search),
+enter a natural-language question, and optionally select a collection/document and top-K
+(1–20). Results show original text, filenames, one-based PDF pages and cosine similarity;
+**Open original** opens that PDF page. No answer or conversation is generated.
+
+The actual local `nomic-embed-text` response was verified as 768-dimensional. Dimensions
+are validated from responses rather than hardcoded in production. Model name/digest,
+actual dimension and prefix settings identify compatible indexes. Changing any of them
+requires reindexing; incompatible indexes are excluded with a UI notice. Reprocessing
+removes old embeddings, deletion cascades cleanup, and retries atomically replace vectors.
+
+- `POST /api/documents/{id}/index`: index, retry or reindex a processed document.
+- `GET /api/documents/{id}/indexing`: stored indexing state/model metadata.
+- `POST /api/search`: query, optional `top_k`, `collection_id`, `document_id`.
+
+Default indexing is batched (16 chunks), with a 180-second budget, 60-second provider
+request timeouts, at most 2,000 chunks/2,000,000 vector values per document, and bounded
+query concurrency. See `.env.example` for optional limits/prefix settings; keep your
+private `.env` unchanged unless you choose different values. Source passages may be
+irrelevant despite being nearest neighbors; similarity is not confidence. Exact cosine
+search is used initially, with no approximate index or text-similarity fallback.
+
+## Existing database compatibility
+
+The pgvector image builds on the same pinned PostgreSQL 17 Alpine runtime. This upgrade
+verified PostgreSQL 17.11, Alpine/libc, byte-identical server/runtime binaries and the
+unchanged PostgreSQL cluster identity before retaining the existing named volume.
+**For another existing installation, check its major version/runtime and take a private
+backup before changing the image. Stop if they differ; do not reset the volume or switch
+libc families as a shortcut.** See the [upgrade runbook](docs/architecture/semantic-search.md#database-image-and-upgrade-runbook).
 
 ## Windows setup or upgrade from earlier milestones
 
-Prerequisites: Python 3.12+, Node.js 24 with npm, Git, Docker Desktop with Linux containers/Compose, and optionally running Ollama for a completely healthy dashboard. The tested workstation uses Python 3.12.10 and Node 24.16.0. No new Ollama models are needed.
+Prerequisites: Python 3.12+, Node.js 24 with npm, Git, Docker Desktop with Linux containers/Compose, and running Ollama with `nomic-embed-text` for indexing/search (library management can still operate without it). The tested workstation uses Python 3.12.10 and Node 24.16.0. The existing `nomic-embed-text` model is reused; do not pull a chat model for this milestone.
 
 Commands below are PowerShell. Substitute your checkout path. Existing `.env` settings and database volumes should be retained. `npm.cmd` avoids PowerShell execution-policy problems, and direct virtual-environment Python paths avoid activation requirements.
 
@@ -83,14 +117,16 @@ if (-not (Test-Path backend/.venv/Scripts/python.exe)) { python -m venv backend/
 npm.cmd --prefix frontend ci
 
 docker compose --profile app config --quiet
-docker compose up -d --wait postgres
+docker compose build postgres
+# For existing volumes, complete the compatibility checks linked above first.
+docker compose up -d --no-deps --wait postgres
 Set-Location backend
 .\.venv\Scripts\python.exe -m alembic upgrade head
 .\.venv\Scripts\python.exe -m alembic current
 .\.venv\Scripts\python.exe -m alembic check
 ```
 
-Expect PostgreSQL to become healthy, revision `0002_document_processing (head)`, and `No new upgrade operations detected.` Startup never creates tables or runs migrations automatically. The new additive migration extends document statuses and adds `document_chunks`; it preserves existing collections, documents, PDFs and database volumes.
+Expect PostgreSQL to become healthy, revision `0003_semantic_search (head)`, and `No new upgrade operations detected.` Startup never creates tables or runs migrations automatically. The additive migration enables pgvector and adds derived embeddings/indexing metadata, preserving existing collections, documents, text chunks, PDFs and database volumes.
 
 Start the backend in one terminal:
 
@@ -176,11 +212,11 @@ Upload failures roll back metadata and clean up staged/promoted files. Duplicate
 
 SQL and files cannot form one atomic transaction. Hard crashes, ambiguous commits, or disk/recovery failures can leave files requiring operator reconciliation; no startup routine automatically deletes them. Quarantined filenames retain their storage keys for recovery. Back up PostgreSQL and the upload directory together with writers stopped. If Windows blocks a move while another client is downloading, deletion returns an error and can be retried after that download ends.
 
-PDF validation is not malware scanning, content sanitization, or proof of safety. Files remain untrusted; the parser subprocess has a timeout but no OS memory/CPU sandbox or reduced filesystem privileges. Upload storage is not encrypted by the app. Preview is one page at a time with a bounded canvas; original-file streaming does not offer range/resume support. There is no authentication, OCR, full-text search, embedding, retrieval, or AI chat. Extraction has additional timeout, page/text/output/concurrency limits; the Linux child has a 1 GiB address-space ceiling. Windows transient page memory is not hard-capped. See the processing architecture for details.
+PDF validation is not malware scanning, content sanitization, or proof of safety. Files remain untrusted; the parser subprocess has a timeout but no OS memory/CPU sandbox or reduced filesystem privileges. Upload storage is not encrypted by the app. Preview is one page at a time with a bounded canvas; original-file streaming does not offer range/resume support. There is no authentication, OCR, lexical/full-text search, generated answer or AI chat. Semantic vector retrieval is available for explicitly indexed chunks. Extraction has additional timeout, page/text/output/concurrency limits; the Linux child has a 1 GiB address-space ceiling. Windows transient page memory is not hard-capped. See the processing architecture for details.
 
 ## Tests and quality checks
 
-Backend tests use temporary SQLite databases and temporary upload directories, never your real uploads. Direct `create_all` exists only in isolated fixtures. Live verification separately checks the Alembic-managed PostgreSQL schema. The non-blocking upstream Starlette TestClient HTTPX deprecation warning is recorded in the verification report.
+Backend unit tests use temporary SQLite databases and upload directories. Explicit PostgreSQL vector tests use isolated disposable schemas with mocked embeddings. Tests never process user uploads. Direct `create_all` exists only in isolated fixtures. Live verification separately checks the Alembic-managed PostgreSQL schema. To run real pgvector tests after migration, set `$env:RAGVAULT_TEST_POSTGRES="1"` and run `python -m pytest -m postgres`; remove that variable afterward. Ollama remains mocked in automated tests. The existing Starlette TestClient HTTPX deprecation warning is recorded in the verification report.
 
 ```powershell
 Set-Location 'C:\Projects\ragvault\backend'
@@ -215,14 +251,14 @@ The same URLs apply. Backend storage is `/app/data/uploads`, bind-mounted from `
 
 ## Repository orientation
 
-- `backend/app/api`: health, collection, document, file-serving, and public-limit routes.
+- `backend/app/api`: health, library/file-serving, indexing and semantic-search routes.
 - `backend/app/models`, `schemas`, `services`: SQLAlchemy metadata, validation/response schemas, file storage, and transactional library operations.
 - `backend/app/core`: settings, structured logging, upload-body bounds, and local browser-origin enforcement.
-- `backend/alembic`: the explicit library and page-aware processing migrations.
+- `backend/alembic`: the explicit library, processing and pgvector/indexing migrations.
 - `backend/tests`: isolated health/configuration, collection/document CRUD, PDF validation, cleanup, persistence, and failure tests.
-- `frontend/src/pages`: overview and document library; `features/documents`: dialogs and lazy PDF renderer.
+- `frontend/src/pages`: overview, document library and semantic search; `features/documents`: indexing, dialogs and lazy PDF renderer.
 - `frontend/src/lib`, `hooks`, `types`: typed API client, state/loading/cancellation, and shared types.
 - `frontend/scripts/copy-pdf-assets.mjs`: local preview resource preparation.
 - `docs/architecture`, `docs/screenshots`: current design and actual verification captures.
 
-The root `.env`, virtual environments, data/uploads, caches, build output, generated PDF.js resources, and local `.artifacts` are ignored. `.env.example`, source, migrations, tests, package lockfile, documentation, and screenshots belong in Git. No Milestone 3 commit or push is created without approval.
+The root `.env`, virtual environments, data/uploads, caches, build output, generated PDF.js resources, and local `.artifacts` are ignored. `.env.example`, source, migrations, tests, package lockfile, documentation, and screenshots belong in Git. No Milestone 4 commit or push is created without approval.

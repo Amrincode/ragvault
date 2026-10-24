@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ragvault-backend"
-version = "0.3.0"
-description = "Local-first PDF management, text extraction and page-aware chunking"
+version = "0.4.0"
+description = "Local-first PDF processing and semantic passage search"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115,<1.0",
@@ -17,6 +17,7 @@ dependencies = [
     "httpx>=0.28,<1.0",
     "python-multipart>=0.0.20,<1.0",
     "pymupdf>=1.26,<2.0",
+    "pgvector>=0.5.1,<0.6",
 ]
 
 [project.optional-dependencies]
@@ -28,6 +29,7 @@ include = ["app*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+markers = ["postgres: isolated PostgreSQL/pgvector integration (RAGVAULT_TEST_POSTGRES=1)"]
 
 [tool.ruff]
 target-version = "py312"

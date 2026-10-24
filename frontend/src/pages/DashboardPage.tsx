@@ -66,7 +66,7 @@ export function DashboardPage() {
           <div className="relative">
             <span className="inline-flex items-center gap-2 text-[10px] font-semibold tracking-[0.18em] text-mint">
               <span className="size-1.5 rounded-full bg-mint" />
-              MILESTONE 03 · PDF TEXT PROCESSING
+              MILESTONE 04 · SEMANTIC SEARCH
             </span>
             <h2 className="mt-4 text-xl font-medium tracking-tight">
               A home for your original documents.
@@ -74,8 +74,8 @@ export function DashboardPage() {
             <p className="mt-2 max-w-xl text-sm leading-6 text-white/60">
               Organize PDFs into collections, preview originals, and manage your
               library locally.
-              <br className="hidden sm:block" /> Extract page-aware text chunks.
-              AI conversations remain planned.
+              <br className="hidden sm:block" /> Process and index page-aware
+              chunks, then search original passages. AI answers remain planned.
             </p>
             <div className="mt-6 inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-xs text-mint">
               <Icon name="check" className="size-3.5" />
@@ -219,11 +219,12 @@ export function DashboardPage() {
               Chat with your knowledge
             </h3>
             <p className="mt-2 max-w-sm text-sm leading-6 text-muted">
-              Ask questions with context. Document retrieval, grounded answers,
-              and source citations are planned.
+              Semantic search already retrieves original passages. Generated
+              answers, conversational context and AI citations remain planned.
             </p>
             <p className="mt-5 border-t border-line pt-4 text-xs text-muted">
-              AI chat and retrieval are not implemented yet.
+              AI chat is not implemented. Use Semantic search for source
+              passages.
             </p>
           </article>
         </div>

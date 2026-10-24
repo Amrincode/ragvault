@@ -18,7 +18,11 @@ export function useLibrary(collectionId: string | null, offset: number) {
 
   useEffect(() => {
     if (
-      !documents.items.some((item) => item.processing_status === 'processing')
+      !documents.items.some(
+        (item) =>
+          item.processing_status === 'processing' ||
+          item.indexing_status === 'indexing',
+      )
     )
       return
     const interval = window.setInterval(reload, 2000)

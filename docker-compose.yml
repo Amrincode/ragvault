@@ -2,7 +2,8 @@ name: ragvault
 
 services:
   postgres:
-    image: postgres:17-alpine
+    image: ragvault-postgres:17-vector
+    build: ./database
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-ragvault}
       POSTGRES_USER: ${POSTGRES_USER:-ragvault}

@@ -9,6 +9,7 @@ import {
 } from '../features/documents/LibraryDialogs'
 import { formatBytes } from '../lib/format'
 import { useLibrary } from '../hooks/useLibrary'
+import { IndexingActions } from '../features/documents/IndexingActions'
 import {
   ProcessingActions,
   ProcessingStatus,
@@ -83,7 +84,8 @@ export function DocumentsPage() {
       </div>
       <div className="mt-6 rounded-lg border border-line bg-white px-4 py-3 text-xs leading-5 text-muted">
         <span className="font-medium text-forest">Local library</span> · Single
-        user · PDFs stay on this machine · No AI processing
+        user · PDFs stay on this machine · Local embeddings · No generated
+        answers
       </div>
       <div className="mt-7 grid items-start gap-6 lg:grid-cols-[200px_minmax(0,1fr)]">
         <aside
@@ -250,6 +252,7 @@ export function DocumentsPage() {
                         SHA-256 {item.checksum.slice(0, 12)}…
                       </p>
                       <ProcessingActions document={item} onChanged={reload} />
+                      <IndexingActions document={item} onChanged={reload} />
                     </div>
                     <div className="flex w-full flex-wrap gap-3 pl-15 text-xs sm:w-auto sm:pl-0">
                       <button

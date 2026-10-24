@@ -11,13 +11,17 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.health import router as health_router
 from app.api.library import router as library_router
+from app.api.search import router as search_router
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
 from app.core.origin import LibraryOriginMiddleware
 from app.core.upload_limit import UploadLimitMiddleware
 from app.db.session import build_engine
+from app.services.embeddings import EmbeddingClient
+from app.services.indexing import DocumentIndexer
 from app.services.ollama import OllamaClient
 from app.services.processing import PdfProcessor
+from app.services.search import SemanticSearch
 from app.services.storage import DocumentStorage
 
 logger = logging.getLogger(__name__)
@@ -34,6 +38,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.settings = config
         app.state.storage = DocumentStorage(config)
         app.state.processor = PdfProcessor(config)
+        app.state.indexer = DocumentIndexer(config)
+        app.state.semantic_search = SemanticSearch(config)
         try:
             with httpx.Client(
                 base_url=str(config.ollama_base_url).rstrip("/") + "/",
@@ -41,13 +47,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 trust_env=False,
             ) as client:
                 app.state.ollama = OllamaClient(client)
-                logger.info("RAGVault started")
-                yield
+                with httpx.Client(
+                    base_url=str(config.ollama_base_url).rstrip("/") + "/",
+                    timeout=config.embedding_timeout_seconds,
+                    trust_env=False,
+                ) as embedding_http:
+                    app.state.embeddings = EmbeddingClient(embedding_http, config)
+                    logger.info("RAGVault started")
+                    yield
         finally:
             engine.dispose()
             logger.info("RAGVault stopped")
 
-    app = FastAPI(title="RAGVault API", version="0.3.0", lifespan=lifespan)
+    app = FastAPI(title="RAGVault API", version="0.4.0", lifespan=lifespan)
     app.add_middleware(UploadLimitMiddleware, max_bytes=config.max_upload_bytes)
     app.add_middleware(
         LibraryOriginMiddleware,
@@ -75,6 +87,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.include_router(health_router)
     app.include_router(library_router)
+    app.include_router(search_router)
 
     @app.exception_handler(SQLAlchemyError)
     async def database_failure(request: Request, exc: SQLAlchemyError) -> JSONResponse:

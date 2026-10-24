@@ -38,6 +38,11 @@ beforeEach(() => {
 })
 
 describe('PDF page preview', () => {
+  it('opens the page cited by semantic search', async () => {
+    render(<PdfPreview blob={fixture()} filename="paper.pdf" initialPage={2} />)
+    await waitFor(() => expect(mocks.getPage).toHaveBeenCalledWith(2))
+    expect(screen.getByText('Page 2 of 2')).toBeInTheDocument()
+  })
   it('renders pages and navigates without extracting text', async () => {
     render(<PdfPreview blob={fixture()} filename="paper.pdf" />)
     await waitFor(() =>
