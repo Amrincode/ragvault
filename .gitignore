@@ -4,6 +4,21 @@
 !.env.example
 !**/.env.example
 
+# Credential files and private keys
+.aws/
+.ssh/
+.netrc
+.npmrc
+.pypirc
+credentials*.json
+secrets*.json
+*.secrets.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+
 # Python
 .venv/
 venv/
