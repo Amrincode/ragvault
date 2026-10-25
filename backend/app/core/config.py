@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     database_timeout_seconds: int = Field(default=3, ge=2, le=30)
 
     ollama_base_url: AnyHttpUrl = AnyHttpUrl("http://localhost:11434")
-    ollama_chat_model: str = "llama3.2"
+    ollama_chat_model: str = Field(default="gemma3:4b", min_length=1, max_length=200)
     ollama_embedding_model: str = "nomic-embed-text"
     ollama_timeout_seconds: float = Field(default=3.0, gt=0, le=30)
 
@@ -51,6 +51,16 @@ class Settings(BaseSettings):
     embedding_document_prefix: str = Field(default="search_document: ", max_length=128)
     embedding_query_prefix: str = Field(default="search_query: ", max_length=128)
     search_top_k: int = Field(default=5, ge=1, le=20)
+
+    chat_connect_timeout_seconds: float = Field(default=3, gt=0, le=30)
+    chat_generation_timeout_seconds: float = Field(default=180, ge=5, le=300)
+    chat_context_tokens: int = Field(default=4096, ge=2048, le=8192)
+    chat_response_tokens: int = Field(default=512, ge=64, le=1024)
+    chat_max_answer_chars: int = Field(default=4000, ge=256, le=12000)
+    rag_top_k: int = Field(default=5, ge=1, le=20)
+    rag_context_chars: int = Field(default=6000, ge=512, le=12000)
+    rag_passage_chars: int = Field(default=1600, ge=128, le=4000)
+    rag_min_similarity: float = Field(default=0.5, ge=-1, le=1)
 
     @model_validator(mode="after")
     def validate_chunking(self) -> "Settings":

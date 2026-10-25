@@ -1,5 +1,6 @@
 import { isHealthResponse, type HealthResponse } from '../types/health'
 import type { SearchInput, SearchResponse } from '../types/search'
+import type { ChatInput, ChatResponse } from '../types/chat'
 import type {
   Collection,
   Document,
@@ -40,11 +41,13 @@ async function libraryRequest(
     cache: 'no-store',
     signal: AbortSignal.any([
       AbortSignal.timeout(
-        path.endsWith('/index')
-          ? 660_000
-          : path.endsWith('/process')
-            ? 240_000
-            : 120_000,
+        path === '/api/chat'
+          ? 600_000
+          : path.endsWith('/index')
+            ? 660_000
+            : path.endsWith('/process')
+              ? 240_000
+              : 120_000,
       ),
       ...(options.signal ? [options.signal] : []),
     ]),
@@ -143,6 +146,12 @@ export function listSearchDocuments(
 }
 export const searchPassages = (body: SearchInput, signal?: AbortSignal) =>
   jsonRequest<SearchResponse>('/api/search', {
+    method: 'POST',
+    body: JSON.stringify(body),
+    signal,
+  })
+export const askDocuments = (body: ChatInput, signal?: AbortSignal) =>
+  jsonRequest<ChatResponse>('/api/chat', {
     method: 'POST',
     body: JSON.stringify(body),
     signal,

@@ -16,5 +16,8 @@ def test_startup_does_not_connect_and_shutdown_releases_resources(settings: Sett
             engine.connect.assert_not_called()
             http_client = app.state.ollama.client
             assert not http_client.is_closed
+            chat_client = app.state.llm.client
+            assert not chat_client.is_closed
         engine.dispose.assert_called_once()
         assert http_client.is_closed
+        assert chat_client.is_closed

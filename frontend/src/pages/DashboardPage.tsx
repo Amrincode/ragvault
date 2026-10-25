@@ -66,7 +66,7 @@ export function DashboardPage() {
           <div className="relative">
             <span className="inline-flex items-center gap-2 text-[10px] font-semibold tracking-[0.18em] text-mint">
               <span className="size-1.5 rounded-full bg-mint" />
-              MILESTONE 04 · SEMANTIC SEARCH
+              MILESTONE 05 · DOCUMENT CHAT
             </span>
             <h2 className="mt-4 text-xl font-medium tracking-tight">
               A home for your original documents.
@@ -75,7 +75,7 @@ export function DashboardPage() {
               Organize PDFs into collections, preview originals, and manage your
               library locally.
               <br className="hidden sm:block" /> Process and index page-aware
-              chunks, then search original passages. AI answers remain planned.
+              chunks, then search passages or ask questions with local AI.
             </p>
             <div className="mt-6 inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-xs text-mint">
               <Icon name="check" className="size-3.5" />
@@ -213,18 +213,25 @@ export function DashboardPage() {
           >
             <div className="flex items-center justify-between">
               <Icon name="chat" className="size-6 text-forest" />
-              <span className="planned-badge">Planned</span>
+              <span className="rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-800">
+                Available
+              </span>
             </div>
             <h3 className="mt-5 font-semibold text-ink">
               Chat with your knowledge
             </h3>
             <p className="mt-2 max-w-sm text-sm leading-6 text-muted">
-              Semantic search already retrieves original passages. Generated
-              answers, conversational context and AI citations remain planned.
+              Ask questions about indexed PDFs. Local Gemma answers from
+              retrieved passages with source pages for review. Each question
+              stands alone.
             </p>
             <p className="mt-5 border-t border-line pt-4 text-xs text-muted">
-              AI chat is not implemented. Use Semantic search for source
-              passages.
+              <Link
+                to="/chat"
+                className="font-semibold text-forest hover:underline"
+              >
+                Open document chat →
+              </Link>
             </p>
           </article>
         </div>

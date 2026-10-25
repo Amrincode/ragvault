@@ -2,9 +2,11 @@
 
 A local-first document intelligence portfolio project, built in explicit milestones.
 
-**Current milestone: 4 — Semantic Search and Vector Embeddings.** Organize collections, upload validated PDFs, preview originals, and process documents into page-aware text chunks. Inspect extracted text, index existing chunks with local Ollama, and search original passages by meaning with document/collection filters. Rename, download, reprocess and delete remain available. The dashboard still reports FastAPI, PostgreSQL, and Ollama health.
+See [document chat architecture](docs/architecture/document-chat.md) and [Milestone 5 verification](docs/verification-milestone-5.md) for the current pipeline, policies, measurements and limitations.
 
-**Single user. Local machine only. No authentication. Do not expose this service publicly.** Semantic passage search is implemented. OCR, RAG answers, AI chat, conversation history and background queues are not implemented.
+**Current milestone: 5 — AI Document Chat and RAG.** Organize PDFs, process page-aware chunks, index them with local Ollama, and search original passages by meaning. Ask questions about selected indexed PDFs and receive Gemma answers alongside retrieved source excerpts. Library management, PDF preview, semantic search and health checks remain available.
+
+**Single user. Local machine only. No authentication. Do not expose this service publicly.** Answers can hallucinate; retrieved sources are not verified citations. Persistent conversation history, claim-level citation verification, OCR and background queues are not implemented.
 
 ![Document library](docs/screenshots/document-library.png)
 
@@ -18,7 +20,7 @@ See [semantic search architecture](docs/architecture/semantic-search.md), [Miles
 - PyMuPDF validates uploads; original PDFs live on disk rather than in PostgreSQL.
 - React, TypeScript, Vite, Tailwind CSS, React Router, and PDF.js preview.
 - Docker Compose, Pytest, Ruff, Vitest, React Testing Library, ESLint, Prettier, and GitHub Actions.
-- Ollama runs locally for health checks and `nomic-embed-text` embeddings. No chat model is invoked.
+- Ollama runs locally for health checks, `nomic-embed-text` embeddings and `gemma3:4b` document answers.
 
 ```mermaid
 flowchart LR
@@ -26,7 +28,7 @@ flowchart LR
     API --> DB[(PostgreSQL metadata)]
     API --> PDFs[Local PDF files]
     React --> Preview[PDF.js page preview]
-    API -->|Health and local embeddings| Ollama[Windows Ollama]
+    API -->|Health, embeddings and local chat| Ollama[Windows Ollama]
 ```
 
 ![Semantic passage search](docs/screenshots/semantic-search.png)
@@ -65,7 +67,7 @@ chunks with the final status. Failures retain the original PDF and a safe retry 
 Only one parser runs per API process. Active duplicate attempts and deletion while
 processing return 409. A claim interrupted by a crash can be retried after the timeout
 plus 60 seconds; use **Retry expired processing** or the same process endpoint.
-Paragraph/layout detection is heuristic, chunks do not cross pages, and no OCR or AI chat is performed. Embedding/indexing is a separate explicit action. See the processing architecture for resource limits and restart behavior.
+Paragraph/layout detection is heuristic and chunks do not cross pages. OCR is not included. Processing, indexing and document chat are separate explicit actions. See the processing architecture for resource limits and restart behavior.
 
 ## Semantic passage search
 
@@ -92,6 +94,54 @@ private `.env` unchanged unless you choose different values. Source passages may
 irrelevant despite being nearest neighbors; similarity is not confidence. Exact cosine
 search is used initially, with no approximate index or text-similarity fallback.
 
+## AI document chat
+
+Open [Document chat](http://localhost:5173/chat), choose a collection/document, and ask a
+question about processed and indexed PDFs. The existing filtered pgvector search retrieves
+evidence; a bounded context is sent to local `gemma3:4b` through Ollama's non-streaming
+chat API. Answers show original excerpts and PDF page controls. Each question stands
+alone and replaces the previous result; no conversation is saved.
+
+Empty or low-relevance retrieval returns insufficient evidence without calling Gemma.
+With usable passages, the model can still abstain or hallucinate. Source cards contain
+application-owned metadata; they do not verify every claim. All model output is inert
+plain text. Document commands are treated as untrusted data; the model has no tools,
+filesystem/database access or application secrets. Prompt injection is not solved by
+instructions alone.
+
+Default budgets: one chat per API process, top-K 5, 6,000 serialized context characters,
+1,600 per passage, conservative UTF-8 packing into a 4,096-token model context, 512
+response tokens, 4,000 answer characters and a 180-second generation timeout. The byte
+packing budget often fits fewer passages. Minimum similarity 0.5 is a tunable exclusion
+heuristic, not confidence. See `.env.example` and the [chat architecture](docs/architecture/document-chat.md)
+for the exact policy, trade-offs, error codes and manual checks. Existing `.env` values
+are preserved; no larger model or new dependency is required.
+
+The active packing ceiling is **3,456 UTF-8 bytes** for system and user content
+(`4096 - 512 - 128`), including an 851-byte system prompt. Greedy rank-order selection
+can fill the remaining space with two passages even when top-K retrieves ten. Later
+relevant passages may be excluded and the last included excerpt truncated. The 6,000
+character cap does not override this tighter byte cap. This is an application estimate,
+not Gemma's actual token count or a two-passage model limit.
+
+The [context-budget investigation](docs/context-budget-review.md) reproduced both
+abstention and readable answers, but also observed incorrect category-specific numeric
+claims with evidence present. An `answered` status is not factual verification. The
+metadata-compaction experiment was not adopted; the pipeline, limits, prompts and
+grounding safeguards remain as originally verified for Milestone 5. Broad whole-project
+questions can omit important sections or abstain; inspect the source pages.
+
+```json
+{"question":"How long are backups retained?","collection_id":null,"document_id":null,"top_k":5}
+```
+
+`POST /api/chat` returns `answer`, `status`, structured `sources`, model names, retrieved
+and context counts, excluded incompatible-document count, and separate retrieval,
+generation and total timings. Filters apply before generation and cannot be bypassed by
+the model. Failed retrieval/generation never falls back to general AI knowledge.
+
+![Document chat with synthetic sources](docs/screenshots/document-chat.png)
+
 ## Existing database compatibility
 
 The pgvector image builds on the same pinned PostgreSQL 17 Alpine runtime. This upgrade
@@ -103,7 +153,7 @@ libc families as a shortcut.** See the [upgrade runbook](docs/architecture/seman
 
 ## Windows setup or upgrade from earlier milestones
 
-Prerequisites: Python 3.12+, Node.js 24 with npm, Git, Docker Desktop with Linux containers/Compose, and running Ollama with `nomic-embed-text` for indexing/search (library management can still operate without it). The tested workstation uses Python 3.12.10 and Node 24.16.0. The existing `nomic-embed-text` model is reused; do not pull a chat model for this milestone.
+Prerequisites: Python 3.12+, Node.js 24 with npm, Git, Docker Desktop with Linux containers/Compose, and running Ollama with `nomic-embed-text` for indexing/search and `gemma3:4b` for document answers. Library management can operate without Ollama. The tested workstation uses Python 3.12.10 and Node 24.16.0. Existing models are reused; the app does not download or switch to larger models.
 
 Commands below are PowerShell. Substitute your checkout path. Existing `.env` settings and database volumes should be retained. `npm.cmd` avoids PowerShell execution-policy problems, and direct virtual-environment Python paths avoid activation requirements.
 
@@ -164,7 +214,7 @@ Both apps read the root `.env`; shell environment values take precedence. Existi
 | `PDF_VALIDATION_TIMEOUT_SECONDS` | 15 seconds; synchronous parser subprocess deadline |
 | `OLLAMA_BASE_URL` | Native backend uses `http://localhost:11434` |
 | `OLLAMA_DOCKER_BASE_URL` | Container backend uses `http://host.docker.internal:11434` |
-| `OLLAMA_CHAT_MODEL`, `OLLAMA_EMBEDDING_MODEL` | Reserved settings; configured model names do not trigger processing |
+| `OLLAMA_CHAT_MODEL`, `OLLAMA_EMBEDDING_MODEL` | `gemma3:4b` for chat; `nomic-embed-text` for indexing/query embeddings |
 | `OLLAMA_TIMEOUT_SECONDS`, `LOG_LEVEL` | 3 seconds, `INFO` |
 | `VITE_API_BASE_URL` | `http://localhost:8000`; public build-time setting, never a place for secrets |
 
@@ -212,7 +262,7 @@ Upload failures roll back metadata and clean up staged/promoted files. Duplicate
 
 SQL and files cannot form one atomic transaction. Hard crashes, ambiguous commits, or disk/recovery failures can leave files requiring operator reconciliation; no startup routine automatically deletes them. Quarantined filenames retain their storage keys for recovery. Back up PostgreSQL and the upload directory together with writers stopped. If Windows blocks a move while another client is downloading, deletion returns an error and can be retried after that download ends.
 
-PDF validation is not malware scanning, content sanitization, or proof of safety. Files remain untrusted; the parser subprocess has a timeout but no OS memory/CPU sandbox or reduced filesystem privileges. Upload storage is not encrypted by the app. Preview is one page at a time with a bounded canvas; original-file streaming does not offer range/resume support. There is no authentication, OCR, lexical/full-text search, generated answer or AI chat. Semantic vector retrieval is available for explicitly indexed chunks. Extraction has additional timeout, page/text/output/concurrency limits; the Linux child has a 1 GiB address-space ceiling. Windows transient page memory is not hard-capped. See the processing architecture for details.
+PDF validation is not malware scanning, content sanitization, or proof of safety. Files remain untrusted; the parser subprocess has a timeout but no OS memory/CPU sandbox or reduced filesystem privileges. Upload storage is not encrypted by the app. Preview is one page at a time with a bounded canvas; original-file streaming does not offer range/resume support. Authentication, OCR, lexical/full-text search and persistent conversations are not implemented. Semantic retrieval and document answers are available for explicitly indexed chunks; answers can hallucinate and citations are not claim-verified. Extraction has additional timeout, page/text/output/concurrency limits; the Linux child has a 1 GiB address-space ceiling. Windows transient page memory is not hard-capped. See the processing and chat architectures for details.
 
 ## Tests and quality checks
 
@@ -251,14 +301,14 @@ The same URLs apply. Backend storage is `/app/data/uploads`, bind-mounted from `
 
 ## Repository orientation
 
-- `backend/app/api`: health, library/file-serving, indexing and semantic-search routes.
+- `backend/app/api`: health, library/file-serving, indexing, semantic-search and chat routes.
 - `backend/app/models`, `schemas`, `services`: SQLAlchemy metadata, validation/response schemas, file storage, and transactional library operations.
 - `backend/app/core`: settings, structured logging, upload-body bounds, and local browser-origin enforcement.
 - `backend/alembic`: the explicit library, processing and pgvector/indexing migrations.
 - `backend/tests`: isolated health/configuration, collection/document CRUD, PDF validation, cleanup, persistence, and failure tests.
-- `frontend/src/pages`: overview, document library and semantic search; `features/documents`: indexing, dialogs and lazy PDF renderer.
+- `frontend/src/pages`: overview, document library, semantic search and document chat; `features/documents`: indexing, dialogs and lazy PDF renderer.
 - `frontend/src/lib`, `hooks`, `types`: typed API client, state/loading/cancellation, and shared types.
 - `frontend/scripts/copy-pdf-assets.mjs`: local preview resource preparation.
 - `docs/architecture`, `docs/screenshots`: current design and actual verification captures.
 
-The root `.env`, virtual environments, data/uploads, caches, build output, generated PDF.js resources, and local `.artifacts` are ignored. `.env.example`, source, migrations, tests, package lockfile, documentation, and screenshots belong in Git. No Milestone 4 commit or push is created without approval.
+The root `.env`, virtual environments, data/uploads, caches, build output, generated PDF.js resources, and local `.artifacts` are ignored. `.env.example`, source, migrations, tests, package lockfile, documentation, and synthetic screenshots belong in Git. Milestone 5 publication includes the investigation findings and preserves the original RAG implementation. See [GitHub Actions](https://github.com/Amrincode/ragvault/actions/workflows/ci.yml) for checks on published commits.

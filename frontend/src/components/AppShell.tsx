@@ -60,10 +60,15 @@ export function AppShell({
               <Icon name="search" />
               Semantic search
             </NavLink>
-            <span className="nav-item text-white/45">
+            <NavLink
+              to="/chat"
+              className={({ isActive }) =>
+                `nav-item ${isActive ? 'bg-white/10 text-white' : 'text-white/65 hover:bg-white/5 hover:text-white'}`
+              }
+            >
               <Icon name="chat" />
-              Chat<span className="nav-soon">Soon</span>
-            </span>
+              Document chat
+            </NavLink>
           </nav>
         </div>
         <div className="mx-5 mt-auto hidden border-t border-white/10 py-6 lg:block">
@@ -77,7 +82,7 @@ export function AppShell({
             Running on your machine.
           </p>
           <p className="mt-6 font-mono text-[10px] text-white/30">
-            v0.4.0 · LOCAL SEARCH
+            v0.5.0 · LOCAL RAG
           </p>
         </div>
       </aside>
@@ -87,7 +92,7 @@ export function AppShell({
           <span className="font-medium text-ink">{page}</span>
         </div>
         <span className="rounded-full border border-line bg-white px-3 py-1.5 text-[11px] font-medium text-muted">
-          Milestone 04
+          Milestone 05
         </span>
       </header>
       <main id="main" className="mx-auto max-w-7xl px-6 py-9 lg:px-10 lg:py-11">

@@ -84,8 +84,7 @@ export function DocumentsPage() {
       </div>
       <div className="mt-6 rounded-lg border border-line bg-white px-4 py-3 text-xs leading-5 text-muted">
         <span className="font-medium text-forest">Local library</span> · Single
-        user · PDFs stay on this machine · Local embeddings · No generated
-        answers
+        user · PDFs stay on this machine · Local embeddings and document chat
       </div>
       <div className="mt-7 grid items-start gap-6 lg:grid-cols-[200px_minmax(0,1fr)]">
         <aside
