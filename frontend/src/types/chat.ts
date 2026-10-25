@@ -49,6 +49,7 @@ export interface ChatResponse {
   sources: ChatSource[]
   chat_model: string
   embedding_model: string
+  embedding_dimensions?: number | null
   retrieval_count: number
   context_count: number
   incompatible_documents: number
@@ -60,4 +61,5 @@ export interface ChatResponse {
   }
   claims?: AnswerClaim[]
   verification?: CitationVerification
+  evidence_fallback?: ChatSource[]
 }

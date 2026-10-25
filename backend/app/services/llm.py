@@ -129,13 +129,23 @@ class LLMClient:
             ):
                 raise LLMFailure("invalid_generation")
             selected = SelectedAnswer.model_validate_json(data["message"]["content"])
+            # Each selected quote is its own extractive claim. A model may group
+            # different list items under one selection; they do not corroborate
+            # the first quote. Keep every alias bound to its own unchanged quote.
+            selections = {
+                (citation.citation_id, citation.quote): citation
+                for item in selected.claims
+                for citation in item.citations
+            }
             # Explicit extractive contract: these are untrusted selections until the
             # citation verifier checks aliases, quotations, scope and numerical wording.
             result = GeneratedAnswer(
-                status=selected.status,
+                status="partial"
+                if len(selections) > 6 and selected.status == "answered"
+                else selected.status,
                 claims=[
-                    GeneratedClaim(text=item.citations[0].quote, citations=item.citations)
-                    for item in selected.claims
+                    GeneratedClaim(text=citation.quote, citations=[citation])
+                    for citation in list(selections.values())[:6]
                 ],
             )
             if (

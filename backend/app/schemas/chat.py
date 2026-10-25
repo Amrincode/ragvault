@@ -76,9 +76,11 @@ class ChatResponse(BaseModel):
     sources: list[ChatSource]
     chat_model: str
     embedding_model: str
+    embedding_dimensions: int | None = None
     retrieval_count: int
     context_count: int
     incompatible_documents: int = 0
     timings: ChatTimings
     claims: list[AnswerClaim] = Field(default_factory=list)
     verification: CitationVerification = Field(default_factory=CitationVerification)
+    evidence_fallback: list[ChatSource] = Field(default_factory=list, max_length=2)

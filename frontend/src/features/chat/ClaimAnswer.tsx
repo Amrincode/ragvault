@@ -12,9 +12,13 @@ const reasons = {
 export function ClaimAnswer({
   result,
   onOpenSource,
+  allowSources = true,
+  compact = false,
 }: {
   result: ChatResponse
   onOpenSource: (source: ChatSource) => void
+  allowSources?: boolean
+  compact?: boolean
 }) {
   const accepted =
     result.claims?.filter(
@@ -35,7 +39,7 @@ export function ClaimAnswer({
           Review the sources.
         </p>
       )}
-      {result.verification && (
+      {result.verification && !compact && (
         <p className="text-xs leading-5 text-muted">
           {result.verification.status === 'source_checks_passed'
             ? 'Source integrity and wording checks passed. '
@@ -48,6 +52,33 @@ export function ClaimAnswer({
           {result.answer}
         </p>
       )}
+      {!!result.evidence_fallback?.length && (
+        <details className="rounded-lg border border-line p-3 text-sm">
+          <summary className="cursor-pointer font-medium">
+            Retrieved source excerpts · not an answer
+          </summary>
+          <p className="mt-2 text-xs text-muted">
+            Evidence was retrieved, but no generated answer passed. These
+            original excerpts may be incomplete or irrelevant; they are not
+            verified facts or accepted answer claims.
+          </p>
+          {result.evidence_fallback.map((source) => (
+            <div key={source.source_id} className="mt-3">
+              <button
+                type="button"
+                disabled={!allowSources}
+                className="text-xs text-forest underline"
+                onClick={() => onOpenSource(source)}
+              >
+                {source.filename} · Page {source.page_number}
+              </button>
+              <blockquote className="mt-2 whitespace-pre-wrap break-words text-sm leading-6">
+                {source.excerpt}
+              </blockquote>
+            </div>
+          ))}
+        </details>
+      )}
       {accepted.length > 0 && (
         <ol aria-label="Answer claims" className="space-y-5">
           {accepted.map((claim, index) => (
@@ -58,6 +89,7 @@ export function ClaimAnswer({
                   <button
                     key={citationIndex}
                     type="button"
+                    disabled={!allowSources}
                     className="mx-1 rounded px-1 font-semibold text-forest underline focus-visible:outline-2"
                     aria-label={`Open citation ${citation.number}: ${citation.filename}, page ${citation.page_number}`}
                     onClick={() => onOpenSource(citation)}
@@ -66,10 +98,12 @@ export function ClaimAnswer({
                   </button>
                 ))}
               </p>
-              <p className="mt-1 text-[11px] text-muted">
-                Source wording matched · factual support not independently
-                established
-              </p>
+              {!compact && (
+                <p className="mt-1 text-[11px] text-muted">
+                  Source wording matched · factual support not independently
+                  established
+                </p>
+              )}
               {claim.citations.map((citation, citationIndex) => (
                 <details
                   key={citationIndex}
@@ -115,6 +149,19 @@ export function ClaimAnswer({
               </li>
             ))}
           </ul>
+        </details>
+      )}
+      {compact && result.verification && (
+        <details className="text-xs text-muted">
+          <summary className="cursor-pointer">
+            Citation checks and limitations
+          </summary>
+          <p className="mt-2">{result.verification.notice}</p>
+          <p>
+            Accepted: {result.verification.accepted_claims}; withheld:{' '}
+            {result.verification.withheld_claims}. Checks:{' '}
+            {result.verification.status}.
+          </p>
         </details>
       )}
     </div>

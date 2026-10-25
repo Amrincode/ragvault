@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     rag_context_chars: int = Field(default=6000, ge=512, le=12000)
     rag_passage_chars: int = Field(default=1600, ge=128, le=4000)
     rag_min_similarity: float = Field(default=0.5, ge=-1, le=1)
+    conversation_history_messages: int = Field(default=4, ge=0, le=20)
+    conversation_history_chars: int = Field(default=600, ge=0, le=2000)
+    conversation_max_messages: int = Field(default=500, ge=2, le=10000)
 
     @model_validator(mode="after")
     def validate_chunking(self) -> "Settings":

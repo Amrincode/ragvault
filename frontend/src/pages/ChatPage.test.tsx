@@ -72,7 +72,7 @@ beforeEach(() => {
 })
 function mount() {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={['/chat?mode=single']}>
       <ChatPage />
     </MemoryRouter>,
   )

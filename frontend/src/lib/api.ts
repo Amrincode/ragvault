@@ -2,6 +2,13 @@ import { isHealthResponse, type HealthResponse } from '../types/health'
 import type { SearchInput, SearchResponse } from '../types/search'
 import type { ChatInput, ChatResponse } from '../types/chat'
 import type {
+  Conversation,
+  ConversationPage,
+  MessagePage,
+  SavedTurn,
+  TurnInput,
+} from '../types/conversations'
+import type {
   Collection,
   Document,
   DocumentPage,
@@ -41,7 +48,8 @@ async function libraryRequest(
     cache: 'no-store',
     signal: AbortSignal.any([
       AbortSignal.timeout(
-        path === '/api/chat'
+        path === '/api/chat' ||
+          (path.startsWith('/api/conversations/') && path.endsWith('/messages'))
           ? 600_000
           : path.endsWith('/index')
             ? 660_000
@@ -152,6 +160,49 @@ export const searchPassages = (body: SearchInput, signal?: AbortSignal) =>
   })
 export const askDocuments = (body: ChatInput, signal?: AbortSignal) =>
   jsonRequest<ChatResponse>('/api/chat', {
+    method: 'POST',
+    body: JSON.stringify(body),
+    signal,
+  })
+export const listConversations = (offset = 0, signal?: AbortSignal) =>
+  jsonRequest<ConversationPage>(
+    `/api/conversations?limit=20&offset=${offset}`,
+    { signal },
+  )
+export const createConversation = (body: {
+  title: string
+  collection_id: string | null
+  document_id: string | null
+}) =>
+  jsonRequest<Conversation>('/api/conversations', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+export const getConversation = (id: string, signal?: AbortSignal) =>
+  jsonRequest<Conversation>(`/api/conversations/${id}`, { signal })
+export const renameConversation = (id: string, title: string) =>
+  jsonRequest<Conversation>(`/api/conversations/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ title }),
+  })
+export async function deleteConversation(id: string) {
+  await libraryRequest(`/api/conversations/${id}`, { method: 'DELETE' })
+}
+export const getConversationMessages = (
+  id: string,
+  offset = 0,
+  signal?: AbortSignal,
+) =>
+  jsonRequest<MessagePage>(
+    `/api/conversations/${id}/messages?limit=20&offset=${offset}`,
+    { signal },
+  )
+export const askConversation = (
+  id: string,
+  body: TurnInput,
+  signal?: AbortSignal,
+) =>
+  jsonRequest<SavedTurn>(`/api/conversations/${id}/messages`, {
     method: 'POST',
     body: JSON.stringify(body),
     signal,

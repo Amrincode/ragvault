@@ -5,9 +5,11 @@ import { Icon } from './Icon'
 export function AppShell({
   children,
   page = 'Overview',
+  compact = false,
 }: {
   children: ReactNode
   page?: string
+  compact?: boolean
 }) {
   return (
     <div className="min-h-screen lg:pl-60">
@@ -82,7 +84,7 @@ export function AppShell({
             Running on your machine.
           </p>
           <p className="mt-6 font-mono text-[10px] text-white/30">
-            v0.6.0 · SOURCE CITATIONS
+            v0.7.0 · SAVED CONVERSATIONS
           </p>
         </div>
       </aside>
@@ -92,10 +94,13 @@ export function AppShell({
           <span className="font-medium text-ink">{page}</span>
         </div>
         <span className="rounded-full border border-line bg-white px-3 py-1.5 text-[11px] font-medium text-muted">
-          Milestone 06
+          Milestone 07
         </span>
       </header>
-      <main id="main" className="mx-auto max-w-7xl px-6 py-9 lg:px-10 lg:py-11">
+      <main
+        id="main"
+        className={`mx-auto max-w-7xl px-6 lg:px-10 ${compact ? 'py-5' : 'py-9 lg:py-11'}`}
+      >
         {children}
       </main>
     </div>

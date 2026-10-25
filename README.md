@@ -2,11 +2,11 @@
 
 A local-first document intelligence portfolio project, built in explicit milestones.
 
-See [source citation architecture](docs/architecture/source-citations.md) and [Milestone 6 verification](docs/verification-milestone-6.md) for the current pipeline, checks, measurements and limitations. The [Milestone 5 report](docs/verification-milestone-5.md) records the earlier chat baseline.
+See [conversation architecture](docs/architecture/conversations.md) and [Milestone 7 verification](docs/verification-milestone-7.md) for the current lifecycle, context policy, measurements and limitations. [Source citations](docs/architecture/source-citations.md), [Milestone 6 verification](docs/verification-milestone-6.md) and its [reliability investigation](docs/citation-reliability-investigation.md) document the grounding baseline.
 
-**Current milestone: 6 — Verifiable Source Citations and Answer Reliability.** Organize PDFs, process page-aware chunks, index them with local Ollama, and search original passages by meaning. Document chat returns extractive claims with numbered source references, checked quotations and original PDF page controls. Library management, PDF preview, semantic search and health checks remain available.
+**Current milestone: 7 — Persistent Conversations and Contextual Follow-ups.** Save scoped document discussions, revisit ordered messages after reload/restart, and use bounded prior user-question topics for fresh-evidence follow-ups. Extractive claims retain numbered source references, checked quotations and original PDF page controls. PDF management, processing, semantic search and stateless chat remain available.
 
-**Single user. Local machine only. No authentication. Do not expose this service publicly.** Source identity and wording checks do not prove factual truth, relevance or completeness. Persistent conversation history, semantic entailment verification, OCR and background queues are not implemented.
+**Single user. Local machine only. No authentication. Do not expose this service publicly.** Saved messages and cited excerpts are private local database data, not encrypted conversation storage. Source checks do not prove truth, relevance or completeness. Multi-user access, semantic entailment verification, streaming, OCR and background queues are not implemented.
 
 ![Document library](docs/screenshots/document-library.png)
 
@@ -99,8 +99,35 @@ search is used initially, with no approximate index or text-similarity fallback.
 Open [Document chat](http://localhost:5173/chat), choose a collection/document, and ask a
 question about processed and indexed PDFs. The existing filtered pgvector search retrieves
 evidence; a bounded context is sent to local `gemma3:4b` through Ollama's non-streaming
-chat API. Answers show original excerpts and PDF page controls. Each question stands
-alone and replaces the previous result; no conversation is saved.
+chat API. Answers show original excerpts and PDF page controls. By default, create a
+saved conversation with an immutable collection/document scope; the URL retains its
+UUID for refresh. Ordered user/assistant messages live in PostgreSQL and survive API
+restarts. Rename/delete controls and older-message pagination are available. A failed
+generation stays visibly failed; explicit retry creates a new turn, while an uncertain
+submission reuses its request key. The [single-question mode](http://localhost:5173/chat?mode=single)
+and existing `POST /api/chat` remain stateless.
+
+Follow-ups use up to four completed prior **user questions**, at most 600 characters
+total, as untrusted topic hints. Assistant answers are never added as authoritative
+facts or evidence. A deterministic query expansion retrieves fresh scoped passages;
+history is separately labelled and counted inside the unchanged context budget. This
+is limited English reference handling, not full conversation understanding. In live
+testing Gemma repeated optional material in a mandatory-only follow-up; see the
+Milestone 7 report for the successful one-fact example and the mixed-requirements failure.
+The [Milestone 7 stabilization report](docs/milestone-7-stabilization.md) records the
+subsequent scrolling/keyboard improvements, category follow-up fixes and real GIQ comparison.
+The direct advanced page-limit question still sometimes has all generated claims withheld.
+Source-checked original excerpts can then be inspected separately under **Retrieved source
+excerpts · not an answer**; those excerpts are not accepted claims or verified facts.
+
+Saved source metadata is checked on load. Reprocessed sources become stale; deleted
+sources become unavailable, with historical text retained and citation buttons disabled.
+Deleting a scoped target never broadens retrieval: create another conversation instead.
+Deleting a conversation cascades only its messages and preserves library documents.
+See the [conversation architecture](docs/architecture/conversations.md) for endpoints,
+transaction failures, interrupted-turn recovery, privacy and exact limits.
+
+![Saved contextual follow-up](docs/screenshots/saved-conversation.png)
 
 Empty or low-relevance retrieval returns insufficient evidence without calling Gemma.
 With usable passages, the model can still abstain or hallucinate. Milestone 6 requests
@@ -198,7 +225,7 @@ Set-Location backend
 .\.venv\Scripts\python.exe -m alembic check
 ```
 
-Expect PostgreSQL to become healthy, revision `0003_semantic_search (head)`, and `No new upgrade operations detected.` Startup never creates tables or runs migrations automatically. The additive migration enables pgvector and adds derived embeddings/indexing metadata, preserving existing collections, documents, text chunks, PDFs and database volumes.
+Expect PostgreSQL to become healthy, revision `0004_conversations (head)`, and `No new upgrade operations detected.` Startup never creates tables or runs migrations automatically. Migration 0003 adds pgvector/indexing metadata; migration 0004 adds conversations and messages while preserving the existing library tables, PDFs and database volume. Do not downgrade 0004 on retained conversation data: that explicit downgrade drops saved history.
 
 Start the backend in one terminal:
 
@@ -284,7 +311,7 @@ Upload failures roll back metadata and clean up staged/promoted files. Duplicate
 
 SQL and files cannot form one atomic transaction. Hard crashes, ambiguous commits, or disk/recovery failures can leave files requiring operator reconciliation; no startup routine automatically deletes them. Quarantined filenames retain their storage keys for recovery. Back up PostgreSQL and the upload directory together with writers stopped. If Windows blocks a move while another client is downloading, deletion returns an error and can be retried after that download ends.
 
-PDF validation is not malware scanning, content sanitization, or proof of safety. Files remain untrusted; the parser subprocess has a timeout but no OS memory/CPU sandbox or reduced filesystem privileges. Upload storage is not encrypted by the app. Preview is one page at a time with a bounded canvas; original-file streaming does not offer range/resume support. Authentication, OCR, lexical/full-text search and persistent conversations are not implemented. Semantic retrieval and document answers are available for explicitly indexed chunks; answers can hallucinate and citations are not claim-verified. Extraction has additional timeout, page/text/output/concurrency limits; the Linux child has a 1 GiB address-space ceiling. Windows transient page memory is not hard-capped. See the processing and chat architectures for details.
+PDF validation is not malware scanning, content sanitization, or proof of safety. Files remain untrusted; the parser subprocess has a timeout but no OS memory/CPU sandbox or reduced filesystem privileges. Upload storage is not encrypted by the app. Preview is one page at a time with a bounded canvas; original-file streaming does not offer range/resume support. Authentication, OCR and lexical/full-text search are not implemented. Scoped persistent conversations are available. Semantic retrieval and document answers are available for explicitly indexed chunks; answers can hallucinate, and source/wording checks do not establish factual truth or complete relevance. Extraction has additional timeout, page/text/output/concurrency limits; the Linux child has a 1 GiB address-space ceiling. Windows transient page memory is not hard-capped. See the processing and chat architectures for details.
 
 ## Tests and quality checks
 

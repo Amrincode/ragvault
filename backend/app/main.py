@@ -12,6 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.chat import router as chat_router
+from app.api.conversations import router as conversation_router
 from app.api.health import router as health_router
 from app.api.library import router as library_router
 from app.api.search import router as search_router
@@ -79,7 +80,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             engine.dispose()
             logger.info("RAGVault stopped")
 
-    app = FastAPI(title="RAGVault API", version="0.6.0", lifespan=lifespan)
+    app = FastAPI(title="RAGVault API", version="0.7.0", lifespan=lifespan)
     app.add_middleware(UploadLimitMiddleware, max_bytes=config.max_upload_bytes)
     app.add_middleware(ChatBodyLimitMiddleware)
     app.add_middleware(
@@ -110,9 +111,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(library_router)
     app.include_router(search_router)
     app.include_router(chat_router)
+    app.include_router(conversation_router)
 
     @app.exception_handler(RequestValidationError)
     async def invalid_request(request: Request, exc: RequestValidationError):
+        if request.url.path.startswith("/api/conversations"):
+            return JSONResponse(
+                status_code=422,
+                content={
+                    "detail": {
+                        "code": "invalid_conversation_request",
+                        "message": "Check the title, UUIDs, question, request key and pagination.",
+                    }
+                },
+            )
         if request.url.path == "/api/chat":
             # Do not reflect private questions or invalid Unicode from validation inputs.
             return JSONResponse(

@@ -66,7 +66,7 @@ export function DashboardPage() {
           <div className="relative">
             <span className="inline-flex items-center gap-2 text-[10px] font-semibold tracking-[0.18em] text-mint">
               <span className="size-1.5 rounded-full bg-mint" />
-              MILESTONE 06 · SOURCE CITATIONS
+              MILESTONE 07 · SAVED CONVERSATIONS
             </span>
             <h2 className="mt-4 text-xl font-medium tracking-tight">
               A home for your original documents.
@@ -223,7 +223,7 @@ export function DashboardPage() {
             <p className="mt-2 max-w-sm text-sm leading-6 text-muted">
               Ask questions about indexed PDFs. Inspect cited claims, supporting
               excerpts and original pages. Source checks do not prove factual
-              truth. Each question stands alone.
+              truth. Save scoped discussions and ask contextual follow-ups.
             </p>
             <p className="mt-5 border-t border-line pt-4 text-xs text-muted">
               <Link

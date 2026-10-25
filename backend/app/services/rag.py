@@ -1,5 +1,6 @@
 """Stateless retrieval + generation. No document writes or conversation persistence."""
 
+import re
 from threading import BoundedSemaphore
 from time import monotonic
 
@@ -12,8 +13,9 @@ from app.schemas.chat import ChatRequest, ChatResponse, ChatTimings, CitationVer
 from app.schemas.search import SearchRequest
 from app.services.citations import CitationVerifier, verify_claims
 from app.services.embeddings import EmbeddingClient
-from app.services.llm import LLMClient, LLMFailure
-from app.services.rag_context import SYSTEM_INSTRUCTIONS, assemble_context, source_payload
+from app.services.evidence_focus import focus_question, page_limit_question, requested_category
+from app.services.llm import GeneratedAnswer, LLMClient, LLMFailure
+from app.services.rag_context import assemble_context, source_payload, system_instructions
 from app.services.search import SemanticSearch
 
 INSUFFICIENT = (
@@ -48,13 +50,16 @@ class RAGEngine:
         llm: LLMClient,
         body: ChatRequest,
         verifier: CitationVerifier,
+        *,
+        history: list[str] | None = None,
+        retrieval_query: str | None = None,
     ) -> ChatResponse:
         if not self.slot.acquire(blocking=False):
             raise api_error(409, "chat_busy", LLM_ERRORS["chat_busy"][1])
         started = monotonic()
         try:
-            minimum_input = len(SYSTEM_INSTRUCTIONS.encode()) + len(
-                source_payload(body.question, []).encode()
+            minimum_input = len(system_instructions(history).encode()) + len(
+                source_payload(body.question, [], history).encode()
             )
             if minimum_input > (
                 self.settings.chat_context_tokens - self.settings.chat_response_tokens - 128
@@ -65,7 +70,7 @@ class RAGEngine:
                 session,
                 embeddings,
                 SearchRequest(
-                    query=body.question,
+                    query=retrieval_query or body.question,
                     collection_id=body.collection_id,
                     document_id=body.document_id,
                     top_k=body.top_k or self.settings.rag_top_k,
@@ -74,7 +79,13 @@ class RAGEngine:
             # Release the read transaction/connection before a slow Ollama generation.
             session.rollback()
             retrieval_ms = (monotonic() - retrieval_started) * 1000
-            sources, messages = assemble_context(self.settings, body, result.items)
+            sources, messages = assemble_context(self.settings, body, result.items, history=history)
+            focused_question = focus_question(body.question, history)
+            unresolved = bool(
+                re.search(r"\b(its|it)\b", body.question, re.I)
+                and page_limit_question(body.question)
+                and not requested_category(focused_question)
+            )
             generation_ms = 0.0
             verification_ms = 0.0
             claims = []
@@ -85,12 +96,18 @@ class RAGEngine:
                 verifier.check_sources(session, sources, body, result.model, result.dimensions)
                 verification_ms += (monotonic() - verification_started) * 1000
                 generation_started = monotonic()
-                generated = llm.generate(messages)
+                generated = (
+                    GeneratedAnswer(status="insufficient_evidence", claims=[])
+                    if unresolved
+                    else llm.generate(messages)
+                )
                 generation_ms = (monotonic() - generation_started) * 1000
                 verification_started = monotonic()
                 verifier.check_sources(session, sources, body, result.model, result.dimensions)
                 if generated.status != "insufficient_evidence":
-                    claims = verify_claims(generated, sources, body.question)
+                    claims = verify_claims(
+                        generated, sources, focus_question(body.question, history)
+                    )
                     accepted = [c for c in claims if c.status == "potentially_supported"]
                     withheld = len(claims) - len(accepted)
                     verification = CitationVerification(
@@ -120,12 +137,22 @@ class RAGEngine:
                             "Review the source passages or ask a more specific question."
                         )
                 verification_ms += (monotonic() - verification_started) * 1000
+                if generated.status == "insufficient_evidence":
+                    answer = (
+                        "Which report or category do you mean? Ask an explicit question or refer "
+                        "to a preceding category question in this conversation."
+                        if unresolved
+                        else "Source passages were retrieved, but the model did not select "
+                        "a usable answer. "
+                        "Review the retrieved excerpts or ask a more specific question."
+                    )
             return ChatResponse(
                 status=status,
                 answer=answer,
                 sources=sources,
                 chat_model=self.settings.ollama_chat_model,
                 embedding_model=result.model,
+                embedding_dimensions=result.dimensions,
                 retrieval_count=len(result.items),
                 context_count=len(sources),
                 incompatible_documents=result.incompatible_documents,
@@ -137,6 +164,11 @@ class RAGEngine:
                 ),
                 claims=claims,
                 verification=verification,
+                evidence_fallback=[
+                    s.model_copy(update={"excerpt": s.excerpt[:600]}) for s in sources[:2]
+                ]
+                if status in {"unreliable", "insufficient_evidence"}
+                else [],
             )
         except LLMFailure as exc:
             code = exc.code if exc.code in LLM_ERRORS else "generation_failed"

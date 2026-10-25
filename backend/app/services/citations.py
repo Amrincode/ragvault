@@ -12,7 +12,14 @@ from app.core.errors import api_error
 from app.models import ChunkEmbedding, Document, DocumentChunk
 from app.schemas.chat import AnswerClaim, ChatRequest, ChatSource, CheckedCitation
 from app.services.embeddings import canonical_model
-from app.services.evidence_focus import category_labels, question_scope_issue
+from app.services.evidence_focus import (
+    category_labels,
+    category_quote_matches,
+    page_limit_question,
+    question_scope_issue,
+    report_contents_question,
+    requested_category,
+)
 from app.services.llm import GeneratedAnswer
 
 
@@ -196,8 +203,21 @@ def verify_claims(
                     issues=["numeric_category_omitted"],
                 )
             )
-        elif issue := question_scope_issue(
-            question, claim.text, [source.excerpt for source in sources]
+        elif (
+            issue := question_scope_issue(
+                question, claim.text, [source.excerpt for source in sources]
+            )
+        ) and not (
+            issue == "requested_category_not_matched"
+            and report_contents_question(question)
+            and not page_limit_question(question)
+            and not NUMBER.search(claim.text)
+            and (label := requested_category(question))
+            and not (category_labels(claim.text) - {label})
+            and all(
+                category_quote_matches(label, c.excerpt, allowed[c.citation_id].excerpt)
+                for c in citations
+            )
         ):
             results.append(
                 AnswerClaim(
@@ -205,6 +225,24 @@ def verify_claims(
                     status="relevance_not_established",
                     citations=citations,
                     issues=[issue],
+                )
+            )
+        elif (
+            (label := requested_category(question))
+            and report_contents_question(question)
+            and not all(
+                category_quote_matches(
+                    label, c.excerpt, allowed[c.citation_id].excerpt, report=True
+                )
+                for c in citations
+            )
+        ):
+            results.append(
+                AnswerClaim(
+                    text=claim.text,
+                    status="relevance_not_established",
+                    citations=citations,
+                    issues=["requested_report_section_not_matched"],
                 )
             )
         else:
@@ -229,9 +267,12 @@ class CitationVerifier:
         body: ChatRequest,
         model: str,
         dimensions: int,
+        *,
+        ordered_aliases: bool = True,
     ) -> None:
         records = self.loader(session, sources)
-        valid = len(records) == len(sources)
+        expected = len(sources) if ordered_aliases else len({s.chunk_id for s in sources})
+        valid = len(records) == expected
         for index, source in enumerate(sources, 1):
             record = records.get(source.chunk_id)
             valid = valid and bool(
@@ -241,7 +282,11 @@ class CitationVerifier:
                 and canonical_model(record.model) == canonical_model(model)
                 and record.dimensions == dimensions
                 and source.source_id == "S-" + str(source.chunk_id)
-                and source.citation_id == f"C{index}"
+                and (
+                    source.citation_id == f"C{index}"
+                    if ordered_aliases
+                    else bool(re.fullmatch(r"C[1-9][0-9]?", source.citation_id))
+                )
                 and source.document_id == record.document_id
                 and source.chunk_id == record.chunk_id
                 and source.filename == record.filename

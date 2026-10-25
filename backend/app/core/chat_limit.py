@@ -10,7 +10,10 @@ class ChatBodyLimitMiddleware:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or scope.get("path") != "/api/chat":
+        path = scope.get("path", "")
+        if scope["type"] != "http" or not (
+            path == "/api/chat" or path.startswith("/api/conversations")
+        ):
             await self.app(scope, receive, send)
             return
         limit = 16384

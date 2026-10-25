@@ -56,6 +56,57 @@ def test_chat_api_contract_and_no_sensitive_logging(settings, caplog):
     assert "Backups last thirty days" not in caplog.text
 
 
+def test_grouped_distinct_quotes_remain_independent_and_invalid_alias_is_not_repaired(settings):
+    from test_citations import source
+
+    from app.services.citations import verify_claims
+
+    data = payload(settings)
+    data["message"]["content"] = json.dumps(
+        {
+            "status": "answered",
+            "claims": [
+                {
+                    "citations": [
+                        {"citation_id": "C1", "quote": "Include a risk analysis."},
+                        {"citation_id": "C1", "quote": "Include a cost estimate."},
+                        {"citation_id": "C99", "quote": "A fabricated requirement."},
+                    ]
+                }
+            ],
+        }
+    )
+    generated = invoke(settings, lambda request: httpx.Response(200, json=data))
+    checked = verify_claims(
+        generated, [source("Include a risk analysis. Include a cost estimate.")]
+    )
+    assert [c.status for c in checked] == [
+        "potentially_supported",
+        "potentially_supported",
+        "invalid_citation",
+    ]
+    assert checked[-1].issues == ["unknown_citation"]
+
+
+def test_grouped_selections_remain_bounded_and_truncation_is_partial(settings):
+    data = payload(settings)
+    data["message"]["content"] = json.dumps(
+        {
+            "status": "answered",
+            "claims": [
+                {
+                    "citations": [
+                        {"citation_id": "C1", "quote": f"Item {i * 3 + j}."} for j in range(3)
+                    ]
+                }
+                for i in range(3)
+            ],
+        }
+    )
+    generated = invoke(settings, lambda request: httpx.Response(200, json=data))
+    assert generated.status == "partial" and len(generated.claims) == 6
+
+
 @pytest.mark.parametrize(
     "change",
     [
