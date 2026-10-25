@@ -14,7 +14,18 @@ def payload(settings, **overrides):
         "done_reason": "stop",
         "message": {
             "role": "assistant",
-            "content": json.dumps({"status": "answered", "answer": "Backups last thirty days."}),
+            "content": json.dumps(
+                {
+                    "status": "answered",
+                    "claims": [
+                        {
+                            "citations": [
+                                {"citation_id": "C1", "quote": "Backups last thirty days."}
+                            ],
+                        }
+                    ],
+                }
+            ),
         },
         **overrides,
     }
@@ -35,11 +46,13 @@ def test_chat_api_contract_and_no_sensitive_logging(settings, caplog):
         assert body["stream"] is False and "tools" not in body
         assert body["options"] == {"temperature": 0, "num_ctx": 4096, "num_predict": 512}
         assert body["format"]["additionalProperties"] is False
+        assert "text" not in body["format"]["$defs"]["EvidenceSelection"]["properties"]
         assert request.extensions["timeout"]["connect"] == 3
         assert request.extensions["timeout"]["read"] == 180
         return httpx.Response(200, json=payload(settings))
 
-    assert invoke(settings, handler).status == "answered"
+    result = invoke(settings, handler)
+    assert result.status == "answered" and result.claims[0].text == "Backups last thirty days."
     assert "Backups last thirty days" not in caplog.text
 
 
@@ -98,7 +111,16 @@ def test_body_answer_and_prompt_budgets(settings):
         invoke(settings, lambda _: httpx.Response(200, content=b"x" * 65537))
     settings.chat_max_answer_chars = 256
     data = payload(settings)
-    data["message"]["content"] = json.dumps({"status": "answered", "answer": "a" * 257})
+    data["message"]["content"] = json.dumps(
+        {
+            "status": "answered",
+            "claims": [
+                {
+                    "citations": [{"citation_id": "C1", "quote": "a" * 257}],
+                }
+            ],
+        }
+    )
     with pytest.raises(LLMFailure, match="invalid_generation"):
         invoke(settings, lambda _: httpx.Response(200, json=data))
     with pytest.raises(LLMFailure, match="chat_context_too_large"):
@@ -134,3 +156,30 @@ def test_elapsed_response_deadline(settings):
 def test_excessively_nested_provider_json_is_rejected(settings):
     with pytest.raises(LLMFailure, match="invalid_generation"):
         invoke(settings, lambda _: httpx.Response(200, content=b"[" * 2000 + b"]" * 2000))
+
+
+@pytest.mark.parametrize(
+    "citation",
+    [
+        {"citation_id": "C1", "quote": "fact", "page_number": 99},
+        {"citation_id": "C1", "quote": "fact", "document_id": "invented"},
+        {"citation_id": "C1"},
+        {"citation_id": "C1", "quote": "\x00"},
+    ],
+)
+def test_malformed_citations_and_model_metadata_are_not_accepted(settings, citation):
+    data = payload(settings)
+    data["message"]["content"] = json.dumps(
+        {"status": "answered", "claims": [{"citations": [citation]}]}
+    )
+    with pytest.raises(LLMFailure, match="invalid_generation"):
+        invoke(settings, lambda _: httpx.Response(200, json=data))
+
+
+def test_freeform_claim_text_is_rejected_rather_than_silently_repaired(settings):
+    data = payload(settings)
+    selected = json.loads(data["message"]["content"])
+    selected["claims"][0]["text"] = "An invented numerical claim: 900 days."
+    data["message"]["content"] = json.dumps(selected)
+    with pytest.raises(LLMFailure, match="invalid_generation"):
+        invoke(settings, lambda _: httpx.Response(200, json=data))

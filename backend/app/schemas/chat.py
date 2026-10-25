@@ -24,6 +24,7 @@ class ChatRequest(BaseModel):
 
 class ChatSource(BaseModel):
     source_id: str
+    citation_id: str = ""
     document_id: UUID
     filename: str
     collection_id: UUID
@@ -36,10 +37,41 @@ class ChatTimings(BaseModel):
     retrieval_ms: float
     generation_ms: float
     total_ms: float
+    verification_ms: float = 0
+
+
+class CheckedCitation(ChatSource):
+    number: int
+    match_method: Literal["exact", "whitespace_normalized"]
+
+
+class AnswerClaim(BaseModel):
+    text: str
+    status: Literal[
+        "potentially_supported",
+        "uncited",
+        "invalid_citation",
+        "support_not_established",
+        "relevance_not_established",
+        "potential_conflict",
+    ]
+    citations: list[CheckedCitation] = Field(default_factory=list)
+    issues: list[str] = Field(default_factory=list)
+
+
+class CitationVerification(BaseModel):
+    status: Literal["not_run", "source_checks_passed", "issues_found"] = "not_run"
+    factual_support: Literal["not_established"] = "not_established"
+    accepted_claims: int = 0
+    withheld_claims: int = 0
+    notice: str = (
+        "Source and wording checks do not independently establish factual truth, "
+        "relevance, completeness or absence of contradictions. Review the original pages."
+    )
 
 
 class ChatResponse(BaseModel):
-    status: Literal["answered", "insufficient_evidence"]
+    status: Literal["answered", "partial", "insufficient_evidence", "unreliable"]
     answer: str
     sources: list[ChatSource]
     chat_model: str
@@ -48,3 +80,5 @@ class ChatResponse(BaseModel):
     context_count: int
     incompatible_documents: int = 0
     timings: ChatTimings
+    claims: list[AnswerClaim] = Field(default_factory=list)
+    verification: CitationVerification = Field(default_factory=CitationVerification)

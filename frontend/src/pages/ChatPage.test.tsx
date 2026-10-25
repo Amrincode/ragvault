@@ -89,6 +89,67 @@ async function submit() {
 }
 
 describe('Document chat', () => {
+  it('cancels an older source preview when the document scope changes', async () => {
+    let finish!: (value: Document) => void
+    vi.mocked(api.getDocument).mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+    )
+    mount()
+    await question()
+    await submit()
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: 'Open retention.pdf at page 2',
+      }),
+    )
+    const signal = vi.mocked(api.getDocument).mock.calls[0][1]!
+    await userEvent.selectOptions(
+      screen.getByLabelText('Collection filter'),
+      'group',
+    )
+    expect(signal.aborted).toBe(true)
+    await act(async () => finish(document))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+  it('opens a checked claim citation at its application-provided PDF page', async () => {
+    vi.mocked(api.askDocuments).mockResolvedValue({
+      ...answer,
+      claims: [
+        {
+          text: 'Backups last thirty days.',
+          status: 'potentially_supported',
+          issues: [],
+          citations: [
+            {
+              ...answer.sources[0],
+              citation_id: 'C1',
+              number: 1,
+              match_method: 'exact',
+            },
+          ],
+        },
+      ],
+      verification: {
+        status: 'source_checks_passed',
+        factual_support: 'not_established',
+        accepted_claims: 1,
+        withheld_claims: 0,
+        notice: 'Source checks do not prove factual truth.',
+      },
+    })
+    mount()
+    await question()
+    await submit()
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: 'Open citation 1: retention.pdf, page 2',
+      }),
+    )
+    expect(await screen.findByRole('dialog')).toHaveTextContent('PDF page 2')
+    expect(api.getDocument).toHaveBeenCalledWith('doc', expect.any(AbortSignal))
+  })
   it('preserves scope, answer and source page', async () => {
     mount()
     await question()

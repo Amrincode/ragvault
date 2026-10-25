@@ -18,7 +18,15 @@ def test_chat_real_pgvector_scopes_pages_and_reprocessing(vector_client):
     first = add_indexed(client, finance["id"], ["Cover", "Revenue is 42 dollars."], "revenue.pdf")
     second = add_indexed(client, nature["id"], ["Forest trees store carbon."], "trees.pdf")
     llm = MagicMock()
-    llm.generate.return_value = GeneratedAnswer(status="answered", answer="Revenue is 42 dollars.")
+    llm.generate.return_value = GeneratedAnswer(
+        status="answered",
+        claims=[
+            {
+                "text": "Revenue is 42 dollars.",
+                "citations": [{"citation_id": "C1", "quote": "Revenue is 42 dollars."}],
+            }
+        ],
+    )
     client.app.dependency_overrides[get_llm] = lambda: llm
     response = client.post(
         "/api/chat",
@@ -30,6 +38,20 @@ def test_chat_real_pgvector_scopes_pages_and_reprocessing(vector_client):
     assert sources[0]["document_id"] == first and sources[0]["collection_id"] == finance["id"]
     sent = llm.generate.call_args.args[0][1]["content"]
     assert "42 dollars" in sent and "Forest trees" not in sent
+    llm.generate.return_value = GeneratedAnswer(
+        status="answered",
+        claims=[
+            {
+                "text": "Forest trees store carbon.",
+                "citations": [{"citation_id": "C2", "quote": "Forest trees store carbon."}],
+            }
+        ],
+    )
+    spoofed = client.post("/api/chat", json={"question": "revenue", "document_id": first}).json()
+    assert spoofed["status"] == "unreliable"
+    assert spoofed["claims"][0]["issues"] == ["unknown_citation"]
+    assert spoofed["claims"][0]["citations"] == []
+    assert all(s["document_id"] == first for s in spoofed["sources"])
     llm.reset_mock()
     mismatch = client.post(
         "/api/chat",

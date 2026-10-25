@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.core.errors import api_error
-from app.schemas.chat import ChatRequest, ChatResponse, ChatTimings
+from app.schemas.chat import ChatRequest, ChatResponse, ChatTimings, CitationVerification
 from app.schemas.search import SearchRequest
+from app.services.citations import CitationVerifier, verify_claims
 from app.services.embeddings import EmbeddingClient
 from app.services.llm import LLMClient, LLMFailure
 from app.services.rag_context import SYSTEM_INSTRUCTIONS, assemble_context, source_payload
@@ -46,6 +47,7 @@ class RAGEngine:
         search: SemanticSearch,
         llm: LLMClient,
         body: ChatRequest,
+        verifier: CitationVerifier,
     ) -> ChatResponse:
         if not self.slot.acquire(blocking=False):
             raise api_error(409, "chat_busy", LLM_ERRORS["chat_busy"][1])
@@ -74,14 +76,50 @@ class RAGEngine:
             retrieval_ms = (monotonic() - retrieval_started) * 1000
             sources, messages = assemble_context(self.settings, body, result.items)
             generation_ms = 0.0
+            verification_ms = 0.0
+            claims = []
+            verification = CitationVerification()
             status, answer = "insufficient_evidence", INSUFFICIENT
             if sources:
+                verification_started = monotonic()
+                verifier.check_sources(session, sources, body, result.model, result.dimensions)
+                verification_ms += (monotonic() - verification_started) * 1000
                 generation_started = monotonic()
                 generated = llm.generate(messages)
                 generation_ms = (monotonic() - generation_started) * 1000
-                status = generated.status
-                if status == "answered":
-                    answer = generated.answer.strip()
+                verification_started = monotonic()
+                verifier.check_sources(session, sources, body, result.model, result.dimensions)
+                if generated.status != "insufficient_evidence":
+                    claims = verify_claims(generated, sources, body.question)
+                    accepted = [c for c in claims if c.status == "potentially_supported"]
+                    withheld = len(claims) - len(accepted)
+                    verification = CitationVerification(
+                        status="issues_found"
+                        if withheld or not accepted
+                        else "source_checks_passed",
+                        accepted_claims=len(accepted),
+                        withheld_claims=withheld,
+                    )
+                    if accepted:
+                        status = (
+                            "partial" if withheld or generated.status == "partial" else "answered"
+                        )
+                        answer = "\n\n".join(
+                            claim.text
+                            + " "
+                            + " ".join(
+                                f"[{number}]"
+                                for number in dict.fromkeys(c.number for c in claim.citations)
+                            )
+                            for claim in accepted
+                        )
+                    else:
+                        status = "unreliable"
+                        answer = (
+                            "No generated claims passed the citation and wording checks. "
+                            "Review the source passages or ask a more specific question."
+                        )
+                verification_ms += (monotonic() - verification_started) * 1000
             return ChatResponse(
                 status=status,
                 answer=answer,
@@ -95,7 +133,10 @@ class RAGEngine:
                     retrieval_ms=round(retrieval_ms, 2),
                     generation_ms=round(generation_ms, 2),
                     total_ms=round((monotonic() - started) * 1000, 2),
+                    verification_ms=round(verification_ms, 2),
                 ),
+                claims=claims,
+                verification=verification,
             )
         except LLMFailure as exc:
             code = exc.code if exc.code in LLM_ERRORS else "generation_failed"

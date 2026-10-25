@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { PreviewDialog } from '../features/documents/LibraryDialogs'
+import { ClaimAnswer } from '../features/chat/ClaimAnswer'
 import {
   askDocuments,
   getDocument,
@@ -64,13 +65,18 @@ export function ChatPage() {
     [],
   )
 
+  function clearResult() {
+    previewRequest.current?.abort()
+    setPreview(null)
+    setResult(null)
+  }
   async function ask() {
     if (busy || !question.trim()) return
     const controller = new AbortController()
     active.current = controller
     setBusy(true)
     setError(null)
-    setResult(null)
+    clearResult()
     setAsked(question.trim())
     try {
       const next = await askDocuments(
@@ -115,9 +121,9 @@ export function ChatPage() {
         Document chat
       </h1>
       <p className="mt-3 max-w-2xl text-sm leading-6 text-muted">
-        Ask a question and Gemma will use retrieved PDF passages to draft an
-        answer. Answers can be wrong. Review the supporting text and original
-        pages.
+        Ask a question and Gemma will select original PDF wording for an
+        extractive answer. Quotes can be incomplete or irrelevant. Review the
+        supporting text and original pages.
       </p>
       <p className="mt-3 text-xs leading-5 text-muted">
         First upload, process and index PDFs in{' '}
@@ -147,7 +153,7 @@ export function ChatPage() {
                 setDocument('')
                 setOffset(0)
                 setDocuments(null)
-                setResult(null)
+                clearResult()
                 setLoadingFilters(true)
               }}
             >
@@ -168,7 +174,7 @@ export function ChatPage() {
               disabled={busy || loadingFilters}
               onChange={(event) => {
                 setDocument(event.target.value)
-                setResult(null)
+                clearResult()
               }}
             >
               <option value="">All documents</option>
@@ -192,7 +198,7 @@ export function ChatPage() {
               disabled={busy}
               onChange={(event) => {
                 setTopK(Number(event.target.value))
-                setResult(null)
+                clearResult()
               }}
             />
           </label>
@@ -206,7 +212,7 @@ export function ChatPage() {
               onClick={() => {
                 setOffset(Math.max(0, offset - 100))
                 setDocument('')
-                setResult(null)
+                clearResult()
                 setLoadingFilters(true)
               }}
             >
@@ -225,7 +231,7 @@ export function ChatPage() {
               onClick={() => {
                 setOffset(offset + 100)
                 setDocument('')
-                setResult(null)
+                clearResult()
                 setLoadingFilters(true)
               }}
             >
@@ -271,19 +277,24 @@ export function ChatPage() {
             <p className="eyebrow">
               {result.status === 'answered'
                 ? 'ANSWER FROM RETRIEVED TEXT'
-                : 'INSUFFICIENT EVIDENCE'}
+                : result.status === 'partial'
+                  ? 'PARTIAL ANSWER'
+                  : result.status === 'unreliable'
+                    ? 'ANSWER WITHHELD'
+                    : 'INSUFFICIENT EVIDENCE'}
             </p>
             <h2 className="mt-3 break-words text-base font-semibold">
               {asked}
             </h2>
-            {/* Plain text intentionally: no HTML/Markdown parser or model-controlled links. */}
-            <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-7">
-              {result.answer}
-            </p>
+            <ClaimAnswer
+              result={result}
+              onOpenSource={(source) => void openSource(source)}
+            />
             <p className="mt-5 text-xs leading-5 text-muted">
               {result.chat_model} · Retrieval{' '}
               {result.timings.retrieval_ms.toFixed(0)} ms · Generation{' '}
-              {result.timings.generation_ms.toFixed(0)} ms ·{' '}
+              {result.timings.generation_ms.toFixed(0)} ms · Source checks{' '}
+              {(result.timings.verification_ms ?? 0).toFixed(0)} ms ·{' '}
               {result.context_count} of {result.retrieval_count} retrieved
               passages used as context
             </p>
@@ -309,6 +320,9 @@ export function ChatPage() {
                     className="rounded-xl border border-line bg-white p-5"
                   >
                     <h3 className="break-words text-sm font-semibold">
+                      {source.citation_id
+                        ? `[${source.citation_id.slice(1)}] `
+                        : ''}
                       {source.filename} · Page {source.page_number}
                     </h3>
                     <p className="mt-2 break-all font-mono text-[10px] text-muted">

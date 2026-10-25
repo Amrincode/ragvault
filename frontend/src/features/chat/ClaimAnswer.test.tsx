@@ -1,0 +1,180 @@
+import { fireEvent, render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
+import type { ChatResponse, CheckedCitation } from '../../types/chat'
+import { ClaimAnswer } from './ClaimAnswer'
+
+const citation: CheckedCitation = {
+  citation_id: 'C1',
+  source_id: 'S-chunk',
+  number: 1,
+  chunk_id: 'chunk',
+  document_id: 'document',
+  collection_id: 'collection',
+  filename: 'synthetic.pdf',
+  page_number: 2,
+  excerpt: 'Starter teams: 2 to 3 members.',
+  match_method: 'exact',
+}
+const response: ChatResponse = {
+  status: 'answered',
+  answer: 'Starter teams: 2 to 3 members. [1]',
+  sources: [citation],
+  chat_model: 'gemma3:4b',
+  embedding_model: 'nomic-embed-text',
+  retrieval_count: 1,
+  context_count: 1,
+  incompatible_documents: 0,
+  timings: {
+    retrieval_ms: 1,
+    generation_ms: 2,
+    verification_ms: 1,
+    total_ms: 4,
+  },
+  claims: [
+    {
+      text: 'Starter teams: 2 to 3 members.',
+      status: 'potentially_supported',
+      citations: [citation],
+      issues: [],
+    },
+  ],
+  verification: {
+    status: 'source_checks_passed',
+    factual_support: 'not_established',
+    accepted_claims: 1,
+    withheld_claims: 0,
+    notice: 'Source checks do not independently establish factual truth.',
+  },
+}
+
+describe('Claim citations', () => {
+  it('shows numbered references with the correct application-owned page', () => {
+    const open = vi.fn()
+    render(<ClaimAnswer result={response} onOpenSource={open} />)
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Open citation 1: synthetic.pdf, page 2',
+      }),
+    )
+    expect(open).toHaveBeenCalledWith(citation)
+    expect(
+      screen.getByText(
+        /Source checks do not independently establish factual truth\./,
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/factual support not independently established/),
+    ).toBeInTheDocument()
+  })
+  it('supports keyboard-accessible excerpt disclosure and multiple references', () => {
+    const second = { ...citation, citation_id: 'C2', number: 2, page_number: 3 }
+    render(
+      <ClaimAnswer
+        result={{
+          ...response,
+          claims: [{ ...response.claims![0], citations: [citation, second] }],
+        }}
+        onOpenSource={vi.fn()}
+      />,
+    )
+    expect(
+      screen.getAllByRole('button', { name: /Open citation/ }),
+    ).toHaveLength(2)
+    expect(
+      screen.getByText('Supporting excerpt [1] · synthetic.pdf · Page 2')
+        .tagName,
+    ).toBe('SUMMARY')
+    fireEvent.click(
+      screen.getByText('Supporting excerpt [1] · synthetic.pdf · Page 2'),
+    )
+    expect(
+      screen.getAllByText('Starter teams: 2 to 3 members.').length,
+    ).toBeGreaterThan(1)
+  })
+  it('explains a partial answer and separates withheld claims', () => {
+    render(
+      <ClaimAnswer
+        result={{
+          ...response,
+          status: 'partial',
+          claims: [
+            ...response.claims!,
+            {
+              text: 'Invented fact',
+              status: 'uncited',
+              citations: [citation],
+              issues: ['missing_citation'],
+            },
+          ],
+        }}
+        onOpenSource={vi.fn()}
+      />,
+    )
+    expect(screen.getByRole('status')).toHaveTextContent('Partial answer')
+    expect(screen.getByText('1 generated claim withheld')).toBeInTheDocument()
+    expect(screen.getByText('Missing citation')).toBeInTheDocument()
+    expect(
+      screen.getAllByRole('button', { name: /Open citation/ }),
+    ).toHaveLength(1)
+  })
+  it.each([
+    'invalid_citation',
+    'support_not_established',
+    'relevance_not_established',
+    'potential_conflict',
+  ] as const)('shows %s without an active source link', (status) => {
+    render(
+      <ClaimAnswer
+        result={{
+          ...response,
+          status: 'unreliable',
+          answer: 'Claims withheld.',
+          claims: [
+            {
+              text: 'Incorrect 99-member limit',
+              status,
+              citations: [citation],
+              issues: [],
+            },
+          ],
+        }}
+        onOpenSource={vi.fn()}
+      />,
+    )
+    expect(screen.getByText('Claims withheld.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Open citation/ })).toBeNull()
+    expect(screen.queryByRole('list', { name: 'Answer claims' })).toBeNull()
+  })
+  it('renders model claims, quotes and filenames as inert text', () => {
+    const attack = '<img src=x onerror=alert(1)> [run](javascript:alert(2))'
+    const evil = { ...citation, filename: attack, excerpt: attack }
+    const view = render(
+      <ClaimAnswer
+        result={{
+          ...response,
+          claims: [{ ...response.claims![0], text: attack, citations: [evil] }],
+        }}
+        onOpenSource={vi.fn()}
+      />,
+    )
+    expect(
+      view.container.querySelector('img,script,a[href^="javascript:"]'),
+    ).toBeNull()
+    expect(screen.getAllByText(attack).length).toBeGreaterThan(0)
+  })
+  it('keeps old plain-text responses readable without asserting verification', () => {
+    render(
+      <ClaimAnswer
+        result={{
+          ...response,
+          claims: undefined,
+          verification: undefined,
+          answer: 'Legacy answer',
+        }}
+        onOpenSource={vi.fn()}
+      />,
+    )
+    expect(screen.getByText('Legacy answer')).toBeInTheDocument()
+    expect(screen.queryByText(/checks passed/)).toBeNull()
+  })
+})

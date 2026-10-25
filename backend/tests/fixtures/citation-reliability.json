@@ -1,0 +1,20 @@
+[
+  {
+    "id": "report_contents",
+    "question": "What should students include in their project report?",
+    "pages": ["Project report requirements.\nThe report should include:\na. A problem statement and an analysis of the present situation\nb. An introduction with background research on positioning technology\nc. Design concepts and innovative elements\nd. Technical details and a feasibility study"],
+    "expected_groups": [["problem statement"], ["background research"]]
+  },
+  {
+    "id": "advanced_page_limit",
+    "question": "What is the maximum page count for the advanced category report?",
+    "pages": ["Starter category: Students must submit a project report (not exceeding 20 pages). The report should include the problem statement and technical design.", "Presentation slide requirements. Advanced category teams should keep their presentation to 20 minutes.", "Advanced category: Students must submit a project report (not exceeding 40\npages). The report should include technical details and potential improvements."],
+    "expected_groups": [["advanced", "40", "pages"]]
+  },
+  {
+    "id": "participation",
+    "question": "What are the project participation requirements?",
+    "pages": ["Participation and support. Teams are allowed to contact sponsors for components. Participation in the bootcamp accounts for 10% of the final score and provides practical training. Advanced category: Students must submit a project report (not exceeding 40 pages) explaining the design."],
+    "expected_groups": [["bootcamp", "10%"], ["report", "40", "advanced"]]
+  }
+]

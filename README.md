@@ -2,11 +2,11 @@
 
 A local-first document intelligence portfolio project, built in explicit milestones.
 
-See [document chat architecture](docs/architecture/document-chat.md) and [Milestone 5 verification](docs/verification-milestone-5.md) for the current pipeline, policies, measurements and limitations.
+See [source citation architecture](docs/architecture/source-citations.md) and [Milestone 6 verification](docs/verification-milestone-6.md) for the current pipeline, checks, measurements and limitations. The [Milestone 5 report](docs/verification-milestone-5.md) records the earlier chat baseline.
 
-**Current milestone: 5 — AI Document Chat and RAG.** Organize PDFs, process page-aware chunks, index them with local Ollama, and search original passages by meaning. Ask questions about selected indexed PDFs and receive Gemma answers alongside retrieved source excerpts. Library management, PDF preview, semantic search and health checks remain available.
+**Current milestone: 6 — Verifiable Source Citations and Answer Reliability.** Organize PDFs, process page-aware chunks, index them with local Ollama, and search original passages by meaning. Document chat returns extractive claims with numbered source references, checked quotations and original PDF page controls. Library management, PDF preview, semantic search and health checks remain available.
 
-**Single user. Local machine only. No authentication. Do not expose this service publicly.** Answers can hallucinate; retrieved sources are not verified citations. Persistent conversation history, claim-level citation verification, OCR and background queues are not implemented.
+**Single user. Local machine only. No authentication. Do not expose this service publicly.** Source identity and wording checks do not prove factual truth, relevance or completeness. Persistent conversation history, semantic entailment verification, OCR and background queues are not implemented.
 
 ![Document library](docs/screenshots/document-library.png)
 
@@ -103,8 +103,17 @@ chat API. Answers show original excerpts and PDF page controls. Each question st
 alone and replaces the previous result; no conversation is saved.
 
 Empty or low-relevance retrieval returns insufficient evidence without calling Gemma.
-With usable passages, the model can still abstain or hallucinate. Source cards contain
-application-owned metadata; they do not verify every claim. All model output is inert
+With usable passages, the model can still abstain or hallucinate. Milestone 6 requests
+bounded selections of original quotations, without a separate model paraphrase field.
+Application checks allow only supplied source
+IDs, recheck current database metadata and scope before and after generation, and require
+claim wording inside each cited quotation. Invalid references, unsupported wording and
+heuristic numeric conflicts are withheld. Narrow category/page-limit checks reject
+source-valid answers to the wrong explicit category or numeric field. Results distinguish `answered`, `partial`,
+`insufficient_evidence` and `unreliable`; partial answers can omit important facts.
+Numbered controls open the checked document page, and disclosures show the original
+supporting quotation. These checks establish source/wording integrity rather than factual
+support: false or misleading source text can pass. All model output is inert
 plain text. Document commands are treated as untrusted data; the model has no tools,
 filesystem/database access or application secrets. Prompt injection is not solved by
 instructions alone.
@@ -118,7 +127,7 @@ for the exact policy, trade-offs, error codes and manual checks. Existing `.env`
 are preserved; no larger model or new dependency is required.
 
 The active packing ceiling is **3,456 UTF-8 bytes** for system and user content
-(`4096 - 512 - 128`), including an 851-byte system prompt. Greedy rank-order selection
+(`4096 - 512 - 128`), including a 1,024-byte system prompt. Greedy selection
 can fill the remaining space with two passages even when top-K retrieves ten. Later
 relevant passages may be excluded and the last included excerpt truncated. The 6,000
 character cap does not override this tighter byte cap. This is an application estimate,
@@ -127,20 +136,33 @@ not Gemma's actual token count or a two-passage model limit.
 The [context-budget investigation](docs/context-budget-review.md) reproduced both
 abstention and readable answers, but also observed incorrect category-specific numeric
 claims with evidence present. An `answered` status is not factual verification. The
-metadata-compaction experiment was not adopted; the pipeline, limits, prompts and
-grounding safeguards remain as originally verified for Milestone 5. Broad whole-project
-questions can omit important sections or abstain; inspect the source pages.
+metadata-compaction experiment was not adopted; retrieval, context limits and
+grounding boundaries remain unchanged. After the real-world investigation, a bounded
+stable priority promotes matching report sections or explicit category/page-limit
+clauses within retrieved top-K before packing. Milestone 6 changes the output contract and
+checks, with an updated structured-output prompt. Conservative wording matching rejects
+paraphrases, and conflict detection can overflag numeric fragments or miss differently
+worded contradictions. Broad questions can still omit important sections; inspect the
+source pages. The nine-case live evaluation covered 11 of 12 expected fact items, with
+one omitted broad-answer item and a conservative numeric false positive. See the
+Milestone 6 report for the initial sample. The [real-world citation investigation](docs/citation-reliability-investigation.md)
+records the current extractive contract, retained changes, false rejections, remaining
+alias errors and measured before/after accuracy and latency. Neither report establishes
+general semantic correctness or complete coverage of a private document.
 
 ```json
 {"question":"How long are backups retained?","collection_id":null,"document_id":null,"top_k":5}
 ```
 
 `POST /api/chat` returns `answer`, `status`, structured `sources`, model names, retrieved
-and context counts, excluded incompatible-document count, and separate retrieval,
-generation and total timings. Filters apply before generation and cannot be bypassed by
+and context counts, excluded incompatible-document count, claim-level `citations`,
+`verification` diagnostics and separate retrieval, generation, verification and total
+timings. `verification.factual_support` remains `not_established`. Filters apply before generation and cannot be bypassed by
 the model. Failed retrieval/generation never falls back to general AI knowledge.
 
 ![Document chat with synthetic sources](docs/screenshots/document-chat.png)
+
+![Claim citations and checked synthetic source](docs/screenshots/claim-citations.png)
 
 ## Existing database compatibility
 

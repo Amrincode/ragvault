@@ -6,6 +6,7 @@ import pytest
 
 from app.schemas.chat import ChatRequest
 from app.schemas.search import SearchHit, SearchResponse
+from app.services.citations import CitationVerifier, SourceRecord, get_citation_verifier
 from app.services.llm import GeneratedAnswer, LLMFailure, get_llm
 from app.services.rag_context import SYSTEM_INSTRUCTIONS, assemble_context, source_payload
 from app.services.search import get_search
@@ -39,8 +40,37 @@ def chat(client):
     search.run.return_value = result([hit()])
     llm = MagicMock()
     llm.generate.return_value = GeneratedAnswer(
-        status="answered", answer="Backups are retained for thirty days."
+        status="answered",
+        claims=[
+            {
+                "text": "Encrypted backups are retained for thirty days.",
+                "citations": [
+                    {
+                        "citation_id": "C1",
+                        "quote": "Encrypted backups are retained for thirty days.",
+                    }
+                ],
+            }
+        ],
     )
+
+    def loader(session, sources):
+        return {
+            s.chunk_id: SourceRecord(
+                s.document_id,
+                s.filename,
+                s.collection_id,
+                s.page_number,
+                s.chunk_id,
+                s.excerpt,
+                "nomic-embed-text:latest",
+                768,
+                True,
+            )
+            for s in sources
+        }
+
+    client.app.dependency_overrides[get_citation_verifier] = lambda: CitationVerifier(loader)
     client.app.dependency_overrides[get_search] = lambda: search
     client.app.dependency_overrides[get_llm] = lambda: llm
     return client, search, llm
@@ -62,6 +92,7 @@ def test_success_retrieval_filters_and_source_metadata(chat):
     assert data["status"] == "answered" and data["context_count"] == 1
     assert data["sources"][0] == {
         "source_id": "S-" + str(source.chunk_id),
+        "citation_id": "C1",
         "document_id": str(source.document_id),
         "collection_id": str(source.collection_id),
         "chunk_id": str(source.chunk_id),
@@ -93,7 +124,13 @@ def test_no_usable_evidence_never_invokes_model(chat, hits):
 def test_model_abstention_replaces_unsupported_answer(chat):
     client, _, llm = chat
     llm.generate.return_value = GeneratedAnswer(
-        status="insufficient_evidence", answer="Invented private claim"
+        status="insufficient_evidence",
+        claims=[
+            {
+                "text": "Invented private claim",
+                "citations": [],
+            }
+        ],
     )
     data = client.post("/api/chat", json={"question": "unanswerable"}).json()
     assert data["status"] == "insufficient_evidence"
@@ -230,3 +267,85 @@ def test_chunked_chat_body_limit(chat):
     response = client.post("/api/chat", content=iter([b'{"question":"', b"x" * 17000, b'"}']))
     assert response.status_code == 413
     search.run.assert_not_called()
+
+
+def test_source_checks_and_claim_results_do_not_claim_factual_verification(chat):
+    client, _, _ = chat
+    data = client.post("/api/chat", json={"question": "retention"}).json()
+    assert data["claims"][0]["status"] == "potentially_supported"
+    assert data["claims"][0]["citations"][0]["number"] == 1
+    assert data["verification"]["status"] == "source_checks_passed"
+    assert data["verification"]["factual_support"] == "not_established"
+    assert data["answer"].endswith("[1]")
+
+
+def test_partial_answer_excludes_uncited_claim_but_keeps_diagnostics(chat):
+    client, _, llm = chat
+    valid = llm.generate.return_value.claims[0]
+    llm.generate.return_value = GeneratedAnswer(
+        status="answered", claims=[valid, {"text": "Invented deadline", "citations": []}]
+    )
+    data = client.post("/api/chat", json={"question": "retention and deadline"}).json()
+    assert data["status"] == "partial" and "Invented deadline" not in data["answer"]
+    assert data["claims"][1]["status"] == "uncited"
+    assert data["verification"]["withheld_claims"] == 1
+
+
+@pytest.mark.parametrize(
+    "reference", [{"citation_id": "C99", "quote": "x"}, {"citation_id": "C1", "quote": ""}]
+)
+def test_invalid_citations_withhold_the_entire_claim(chat, reference):
+    client, _, llm = chat
+    llm.generate.return_value = GeneratedAnswer(
+        status="answered", claims=[{"text": "Invented claim", "citations": [reference]}]
+    )
+    data = client.post("/api/chat", json={"question": "q"}).json()
+    assert data["status"] == "unreliable" and "Invented claim" not in data["answer"]
+    assert (
+        data["claims"][0]["status"] == "invalid_citation" and data["claims"][0]["citations"] == []
+    )
+
+
+def test_numeric_category_mistake_is_not_displayed_as_an_answer(chat):
+    client, search, llm = chat
+    text = "Starter teams: 2 to 3 members. Advanced teams: 2 to 5 members."
+    search.run.return_value = result([hit(excerpt=text)])
+    llm.generate.return_value = GeneratedAnswer(
+        status="answered",
+        claims=[
+            {
+                "text": "Starter teams: 2 to 5 members.",
+                "citations": [{"citation_id": "C1", "quote": text}],
+            }
+        ],
+    )
+    data = client.post("/api/chat", json={"question": "team sizes"}).json()
+    assert data["status"] == "unreliable" and "2 to 5" not in data["answer"]
+    assert data["claims"][0]["issues"] == ["numeric_support_not_established"]
+
+
+def test_model_partial_status_is_preserved_for_valid_claims(chat):
+    client, _, llm = chat
+    llm.generate.return_value.status = "partial"
+    data = client.post("/api/chat", json={"question": "q"}).json()
+    assert data["status"] == "partial" and data["verification"]["accepted_claims"] == 1
+
+
+def test_evidence_is_rechecked_after_generation_and_slot_released(chat):
+    client, _, _ = chat
+    old_dependency = client.app.dependency_overrides[get_citation_verifier]
+    old_loader = old_dependency().loader
+    calls = []
+
+    def changed_loader(session, sources):
+        calls.append(1)
+        return old_loader(session, sources) if len(calls) == 1 else {}
+
+    client.app.dependency_overrides[get_citation_verifier] = lambda: CitationVerifier(
+        changed_loader
+    )
+    response = client.post("/api/chat", json={"question": "q"})
+    assert response.status_code == 409 and response.json()["detail"]["code"] == "evidence_changed"
+    assert len(calls) == 2 and "Encrypted backups" not in response.text
+    client.app.dependency_overrides[get_citation_verifier] = old_dependency
+    assert client.post("/api/chat", json={"question": "q"}).status_code == 200

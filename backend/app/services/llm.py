@@ -7,7 +7,7 @@ from typing import Literal
 
 import httpx
 from fastapi import Request
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from app.core.config import Settings
 from app.services.embeddings import canonical_model
@@ -19,11 +19,53 @@ class LLMFailure(Exception):
         super().__init__(code)
 
 
+class GeneratedCitation(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    citation_id: str = Field(min_length=1, max_length=80)
+    quote: str = Field(max_length=400)
+
+    @field_validator("citation_id", "quote")
+    @classmethod
+    def valid_text(cls, value: str) -> str:
+        value.encode("utf-8")
+        if any(ord(c) < 32 and c not in "\n\t\r" for c in value):
+            raise ValueError("Invalid control characters")
+        return value
+
+
+class GeneratedClaim(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    text: str = Field(min_length=1, max_length=400)
+    citations: list[GeneratedCitation] = Field(max_length=3)
+
+    @field_validator("text")
+    @classmethod
+    def valid_text(cls, value: str) -> str:
+        return GeneratedCitation.valid_text(value)
+
+
 class GeneratedAnswer(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    status: Literal["answered", "insufficient_evidence"]
-    answer: str = Field(min_length=1, max_length=12000)
+    status: Literal["answered", "partial", "insufficient_evidence"]
+    claims: list[GeneratedClaim] = Field(max_length=6)
+
+
+class EvidenceSelection(BaseModel):
+    """Model selects evidence only; no independently generated claim text to repair."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    citations: list[GeneratedCitation] = Field(min_length=1, max_length=3)
+
+
+class SelectedAnswer(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    status: Literal["answered", "partial", "insufficient_evidence"]
+    claims: list[EvidenceSelection] = Field(max_length=6)
 
 
 class LLMClient:
@@ -43,8 +85,7 @@ class LLMClient:
                 config.chat_context_tokens - config.chat_response_tokens - 128
             ):
                 raise LLMFailure("chat_context_too_large")
-            schema = GeneratedAnswer.model_json_schema()
-            schema["properties"]["answer"]["maxLength"] = config.chat_max_answer_chars
+            schema = SelectedAnswer.model_json_schema()
             with self.client.stream(
                 "POST",
                 "api/chat",
@@ -87,8 +128,21 @@ class LLMClient:
                 or data.get("error")
             ):
                 raise LLMFailure("invalid_generation")
-            result = GeneratedAnswer.model_validate_json(data["message"]["content"])
-            if not result.answer.strip() or len(result.answer) > config.chat_max_answer_chars:
+            selected = SelectedAnswer.model_validate_json(data["message"]["content"])
+            # Explicit extractive contract: these are untrusted selections until the
+            # citation verifier checks aliases, quotations, scope and numerical wording.
+            result = GeneratedAnswer(
+                status=selected.status,
+                claims=[
+                    GeneratedClaim(text=item.citations[0].quote, citations=item.citations)
+                    for item in selected.claims
+                ],
+            )
+            if (
+                any(not claim.text.strip() for claim in result.claims)
+                or sum(len(claim.text) + 5 * len(claim.citations) + 2 for claim in result.claims)
+                > config.chat_max_answer_chars
+            ):
                 raise LLMFailure("invalid_generation")
             return result
         except httpx.TimeoutException:

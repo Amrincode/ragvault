@@ -21,6 +21,7 @@ from app.core.logging import configure_logging
 from app.core.origin import LibraryOriginMiddleware
 from app.core.upload_limit import UploadLimitMiddleware
 from app.db.session import build_engine
+from app.services.citations import CitationVerifier
 from app.services.embeddings import EmbeddingClient
 from app.services.indexing import DocumentIndexer
 from app.services.llm import LLMClient
@@ -47,6 +48,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.indexer = DocumentIndexer(config)
         app.state.semantic_search = SemanticSearch(config)
         app.state.rag = RAGEngine(config)
+        app.state.citation_verifier = CitationVerifier()
         try:
             with httpx.Client(
                 base_url=str(config.ollama_base_url).rstrip("/") + "/",
@@ -77,7 +79,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             engine.dispose()
             logger.info("RAGVault stopped")
 
-    app = FastAPI(title="RAGVault API", version="0.5.0", lifespan=lifespan)
+    app = FastAPI(title="RAGVault API", version="0.6.0", lifespan=lifespan)
     app.add_middleware(UploadLimitMiddleware, max_bytes=config.max_upload_bytes)
     app.add_middleware(ChatBodyLimitMiddleware)
     app.add_middleware(
