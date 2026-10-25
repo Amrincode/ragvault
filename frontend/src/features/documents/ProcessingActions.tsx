@@ -14,7 +14,7 @@ const labels = {
 export function ProcessingStatus({ document }: { document: Document }) {
   return (
     <span
-      className={`rounded px-2 py-0.5 ${document.processing_status === 'failed' ? 'bg-red-50 text-red-800' : 'bg-emerald-50 text-emerald-800'}`}
+      className={`rounded px-2 py-0.5 ${document.processing_status === 'failed' ? 'bg-danger-soft text-danger' : 'bg-success-soft text-success'}`}
     >
       {labels[document.processing_status]}
     </span>
@@ -95,12 +95,12 @@ export function ProcessingActions({
         </p>
       )}
       {document.processing_error && (
-        <p role="alert" className="text-red-800">
+        <p role="alert" className="text-danger">
           {document.processing_error}
         </p>
       )}
       {error && (
-        <p role="alert" className="text-red-800">
+        <p role="alert" className="text-danger">
           {error}
         </p>
       )}

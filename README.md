@@ -4,7 +4,9 @@ A local-first document intelligence portfolio project, built in explicit milesto
 
 See [conversation architecture](docs/architecture/conversations.md) and [Milestone 7 verification](docs/verification-milestone-7.md) for the current lifecycle, context policy, measurements and limitations. [Source citations](docs/architecture/source-citations.md), [Milestone 6 verification](docs/verification-milestone-6.md) and its [reliability investigation](docs/citation-reliability-investigation.md) document the grounding baseline.
 
-**Current milestone: 7 — Persistent Conversations and Contextual Follow-ups.** Save scoped document discussions, revisit ordered messages after reload/restart, and use bounded prior user-question topics for fresh-evidence follow-ups. Extractive claims retain numbered source references, checked quotations and original PDF page controls. PDF management, processing, semantic search and stateless chat remain available.
+**Current UI stage: 8.1 — Shared Design System and Theme Foundation.** Semantic colors, shared controls and Light/Dark/System themes are available. The full page/navigation redesign is not complete; Stage 8.2 has not started. See the [design-system guide](docs/design-system.md) and [Stage 8.1 verification](docs/verification-milestone-8-1.md). In development, inspect components at `/dev/design-system`; the preview is excluded from production builds.
+
+**Application features from Milestones 1–7:** Save scoped document discussions, revisit ordered messages after reload/restart, and use bounded prior user-question topics for fresh-evidence follow-ups. Extractive claims retain numbered source references, checked quotations and original PDF page controls. PDF management, processing, semantic search and stateless chat remain available.
 
 **Single user. Local machine only. No authentication. Do not expose this service publicly.** Saved messages and cited excerpts are private local database data, not encrypted conversation storage. Source checks do not prove truth, relevance or completeness. Multi-user access, semantic entailment verification, streaming, OCR and background queues are not implemented.
 

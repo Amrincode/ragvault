@@ -127,7 +127,7 @@ export default function PdfPreview({
           Rendering PDF page…
         </p>
       )}
-      <div className="max-h-[60vh] overflow-auto rounded-lg border border-line bg-stone-100 p-3">
+      <div className="max-h-[60vh] overflow-auto rounded-lg border border-line bg-canvas p-3">
         <canvas
           ref={canvas}
           role="img"

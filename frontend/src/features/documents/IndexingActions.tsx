@@ -70,12 +70,12 @@ export function IndexingActions({
         </p>
       )}
       {document.indexing_error && (
-        <p className="text-red-800" role="alert">
+        <p className="text-danger" role="alert">
           {document.indexing_error}
         </p>
       )}
       {error && (
-        <p className="text-red-800" role="alert">
+        <p className="text-danger" role="alert">
           {error}
         </p>
       )}

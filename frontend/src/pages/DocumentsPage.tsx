@@ -82,14 +82,14 @@ export function DocumentsPage() {
           </button>
         </div>
       </div>
-      <div className="mt-6 rounded-lg border border-line bg-white px-4 py-3 text-xs leading-5 text-muted">
+      <div className="mt-6 rounded-lg border border-line bg-surface px-4 py-3 text-xs leading-5 text-muted">
         <span className="font-medium text-forest">Local library</span> · Single
         user · PDFs stay on this machine · Local embeddings and document chat
       </div>
       <div className="mt-7 grid items-start gap-6 lg:grid-cols-[200px_minmax(0,1fr)]">
         <aside
           aria-label="Collections"
-          className="rounded-xl border border-line bg-white p-3"
+          className="rounded-xl border border-line bg-surface p-3"
         >
           <h2 className="px-2 py-2 text-xs font-semibold uppercase tracking-wider text-muted">
             Collections
@@ -98,7 +98,7 @@ export function DocumentsPage() {
             type="button"
             onClick={() => selectCollection(null)}
             aria-pressed={selected === null}
-            className={`collection-button ${selected === null ? 'bg-forest text-white' : 'hover:bg-canvas'}`}
+            className={`collection-button ${selected === null ? 'bg-primary text-on-primary' : 'hover:bg-canvas'}`}
           >
             <span>All documents</span>
             <span>{total}</span>
@@ -109,7 +109,7 @@ export function DocumentsPage() {
                 type="button"
                 onClick={() => selectCollection(item.id)}
                 aria-pressed={selected === item.id}
-                className={`collection-button ${selected === item.id ? 'bg-forest text-white' : 'hover:bg-canvas'}`}
+                className={`collection-button ${selected === item.id ? 'bg-primary text-on-primary' : 'hover:bg-canvas'}`}
               >
                 <span className="truncate">{item.name}</span>
                 <span>{item.document_count}</span>
@@ -128,7 +128,7 @@ export function DocumentsPage() {
                   </button>
                   <button
                     type="button"
-                    className="hover:text-red-700"
+                    className="hover:text-danger"
                     aria-label={`Delete collection ${item.name}`}
                     onClick={() =>
                       setDialog({ type: 'deleteCollection', item })
@@ -181,12 +181,12 @@ export function DocumentsPage() {
           {loading && !documents.items.length ? (
             <div
               role="status"
-              className="rounded-xl border border-line bg-white py-16 text-center text-sm text-muted"
+              className="rounded-xl border border-line bg-surface py-16 text-center text-sm text-muted"
             >
               Loading your library…
             </div>
           ) : !documents.items.length ? (
-            <div className="rounded-xl border border-dashed border-line bg-white px-6 py-16 text-center">
+            <div className="rounded-xl border border-dashed border-line bg-surface px-6 py-16 text-center">
               <Icon
                 name="documents"
                 className="mx-auto size-10 text-forest/50"
@@ -212,7 +212,7 @@ export function DocumentsPage() {
               </button>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-xl border border-line bg-white">
+            <div className="overflow-hidden rounded-xl border border-line bg-surface">
               <ul className="divide-y divide-line">
                 {documents.items.map((item) => (
                   <li
@@ -275,7 +275,7 @@ export function DocumentsPage() {
                       </a>
                       <button
                         type="button"
-                        className="text-red-700 hover:underline"
+                        className="text-danger hover:underline"
                         aria-label={`Delete ${item.filename}`}
                         onClick={() =>
                           setDialog({ type: 'deleteDocument', item })

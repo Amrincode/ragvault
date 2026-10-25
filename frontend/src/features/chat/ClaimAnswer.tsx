@@ -33,7 +33,7 @@ export function ClaimAnswer({
       {result.status === 'partial' && (
         <p
           role="status"
-          className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900"
+          className="rounded-lg bg-warning-soft p-3 text-sm text-warning"
         >
           Partial answer: some information is missing or claims were withheld.
           Review the sources.
@@ -128,19 +128,19 @@ export function ClaimAnswer({
         </ol>
       )}
       {withheld.length > 0 && (
-        <details className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <summary className="cursor-pointer text-sm font-medium text-amber-900">
+        <details className="rounded-lg border border-warning-border bg-warning-soft p-4">
+          <summary className="cursor-pointer text-sm font-medium text-warning">
             {withheld.length} generated{' '}
             {withheld.length === 1 ? 'claim withheld' : 'claims withheld'}
           </summary>
-          <p className="mt-2 text-xs text-amber-900">
+          <p className="mt-2 text-xs text-warning">
             These model statements are excluded from the answer. They are not
             established facts.
           </p>
           <ul className="mt-3 space-y-4">
             {withheld.map((claim, index) => (
               <li key={index}>
-                <p className="text-xs font-semibold text-amber-900">
+                <p className="text-xs font-semibold text-warning">
                   {reasons[claim.status]}
                 </p>
                 <p className="mt-1 whitespace-pre-wrap break-words text-sm">

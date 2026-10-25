@@ -137,7 +137,7 @@ export function SingleQuestionChat() {
         not sent to the model.
       </p>
       <form
-        className="mt-7 space-y-5 rounded-2xl border border-line bg-white p-6"
+        className="mt-7 space-y-5 rounded-2xl border border-line bg-surface p-6"
         onSubmit={(event) => {
           event.preventDefault()
           void ask()
@@ -148,7 +148,7 @@ export function SingleQuestionChat() {
             Collection
             <select
               aria-label="Collection filter"
-              className="mt-2 block w-full rounded-lg border border-line p-2"
+              className="mt-2 block w-full rounded-lg border border-control-border p-2"
               value={collection}
               disabled={busy || loadingFilters}
               onChange={(event) => {
@@ -172,7 +172,7 @@ export function SingleQuestionChat() {
             Document
             <select
               aria-label="Document filter"
-              className="mt-2 block w-full rounded-lg border border-line p-2"
+              className="mt-2 block w-full rounded-lg border border-control-border p-2"
               value={document}
               disabled={busy || loadingFilters}
               onChange={(event) => {
@@ -192,7 +192,7 @@ export function SingleQuestionChat() {
             Passages to retrieve
             <input
               aria-label="Passages to retrieve"
-              className="mt-2 block w-24 rounded-lg border border-line p-2"
+              className="mt-2 block w-24 rounded-lg border border-control-border p-2"
               type="number"
               min={1}
               max={20}
@@ -249,7 +249,7 @@ export function SingleQuestionChat() {
           id="chat-question"
           rows={3}
           maxLength={2000}
-          className="w-full rounded-xl border border-line p-3 text-sm"
+          className="w-full rounded-xl border border-control-border p-3 text-sm"
           placeholder="What does the document say about backup retention?"
           value={question}
           disabled={busy}
@@ -276,7 +276,7 @@ export function SingleQuestionChat() {
       )}
       {result && (
         <section aria-label="Document answer" className="mt-7 space-y-5">
-          <div className="rounded-2xl border border-line bg-white p-6">
+          <div className="rounded-2xl border border-line bg-surface p-6">
             <p className="eyebrow">
               {result.status === 'answered'
                 ? 'ANSWER FROM RETRIEVED TEXT'
@@ -303,7 +303,7 @@ export function SingleQuestionChat() {
             </p>
           </div>
           {result.incompatible_documents > 0 && (
-            <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+            <p className="rounded-lg bg-warning-soft p-3 text-xs text-warning">
               {result.incompatible_documents} indexed documents were excluded
               because their embedding settings differ. Reindex them in
               Documents.
@@ -320,7 +320,7 @@ export function SingleQuestionChat() {
                 {result.sources.map((source) => (
                   <li
                     key={source.source_id}
-                    className="rounded-xl border border-line bg-white p-5"
+                    className="rounded-xl border border-line bg-surface p-5"
                   >
                     <h3 className="break-words text-sm font-semibold">
                       {source.citation_id

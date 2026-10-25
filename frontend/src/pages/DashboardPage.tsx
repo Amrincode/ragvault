@@ -59,7 +59,7 @@ export function DashboardPage() {
           </a>
         </div>
 
-        <div className="relative mt-8 overflow-hidden rounded-2xl bg-forest p-7 text-white sm:p-8">
+        <div className="relative mt-8 overflow-hidden rounded-2xl bg-nav p-7 text-nav-ink sm:p-8">
           <div className="pointer-events-none absolute -right-12 -top-24 size-80 rounded-full border border-white/10" />
           <div className="pointer-events-none absolute -right-2 -top-14 size-60 rounded-full border border-white/10" />
           <div className="pointer-events-none absolute right-10 -top-2 size-36 rounded-full border border-white/10" />
@@ -71,7 +71,7 @@ export function DashboardPage() {
             <h2 className="mt-4 text-xl font-medium tracking-tight">
               A home for your original documents.
             </h2>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-white/60">
+            <p className="mt-2 max-w-xl text-sm leading-6 text-nav-muted">
               Organize PDFs into collections, preview originals, and manage your
               library locally.
               <br className="hidden sm:block" /> Process and index page-aware
@@ -114,7 +114,7 @@ export function DashboardPage() {
             onClick={() => {
               void refresh()
             }}
-            className="inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-xs font-medium text-ink transition hover:bg-stone-50 disabled:cursor-wait disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-xs font-medium text-ink transition hover:bg-canvas disabled:cursor-wait disabled:opacity-50"
           >
             <Icon
               name="refresh"
@@ -127,7 +127,7 @@ export function DashboardPage() {
           {services.map((service) => (
             <div
               key={service.name}
-              className="rounded-xl border border-line bg-white p-5"
+              className="rounded-xl border border-line bg-surface p-5"
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="grid size-10 place-items-center rounded-xl bg-canvas text-forest">
@@ -145,7 +145,7 @@ export function DashboardPage() {
         {error && (
           <div
             role="alert"
-            className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900"
+            className="mt-3 rounded-lg border border-warning-border bg-warning-soft p-3 text-xs leading-5 text-warning"
           >
             Cannot read backend health. Start the API and check the configured
             URL and CORS origin. {error}
@@ -154,7 +154,7 @@ export function DashboardPage() {
         {data?.status === 'degraded' && (
           <div
             role="status"
-            className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900"
+            className="mt-3 rounded-lg border border-warning-border bg-warning-soft p-3 text-xs leading-5 text-warning"
           >
             The API is running.{' '}
             {data.database.detail ? `${data.database.detail}. ` : ''}
@@ -185,11 +185,11 @@ export function DashboardPage() {
         <div className="grid gap-4 md:grid-cols-2">
           <article
             id="documents"
-            className="scroll-mt-8 rounded-xl border border-line bg-white p-6"
+            className="scroll-mt-8 rounded-xl border border-line bg-surface p-6"
           >
             <div className="flex items-center justify-between">
               <Icon name="documents" className="size-6 text-forest" />
-              <span className="rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-800">
+              <span className="rounded-md bg-success-soft px-2 py-1 text-[10px] font-medium text-success">
                 Available
               </span>
             </div>
@@ -209,11 +209,11 @@ export function DashboardPage() {
           </article>
           <article
             id="chat"
-            className="scroll-mt-8 rounded-xl border border-line bg-white p-6"
+            className="scroll-mt-8 rounded-xl border border-line bg-surface p-6"
           >
             <div className="flex items-center justify-between">
               <Icon name="chat" className="size-6 text-forest" />
-              <span className="rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-800">
+              <span className="rounded-md bg-success-soft px-2 py-1 text-[10px] font-medium text-success">
                 Available
               </span>
             </div>

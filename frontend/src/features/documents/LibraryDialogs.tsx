@@ -148,7 +148,7 @@ export function DeleteDialog({
         </button>
         <button
           type="button"
-          className="rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white hover:bg-red-800 disabled:opacity-50"
+          className="rounded-lg bg-danger-action px-4 py-2 text-sm font-medium text-on-danger hover:bg-danger-hover disabled:opacity-50"
           disabled={busy}
           onClick={() => {
             void confirm()
@@ -250,7 +250,7 @@ export function UploadDialog({
             setDragging(false)
             if (!busy) choose(event.dataTransfer.files)
           }}
-          className={`mt-5 rounded-xl border-2 border-dashed p-6 text-center ${dragging ? 'border-forest bg-emerald-50' : 'border-line bg-canvas'}`}
+          className={`mt-5 rounded-xl border-2 border-dashed p-6 text-center ${dragging ? 'border-forest bg-success-soft' : 'border-line bg-canvas'}`}
         >
           <Icon name="upload" className="mx-auto mb-3 size-7 text-forest" />
           <label htmlFor={`${id}-file`} className="block text-sm font-medium">
@@ -263,7 +263,7 @@ export function UploadDialog({
             accept=".pdf,application/pdf"
             disabled={busy}
             onChange={(event) => choose(event.target.files)}
-            className="mt-4 w-full text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-2 file:font-medium file:text-forest"
+            className="mt-4 w-full text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-surface file:px-3 file:py-2 file:font-medium file:text-forest"
           />
           <p className="mt-3 text-xs text-muted">
             Up to {formatBytes(config.max_upload_bytes)} ·{' '}

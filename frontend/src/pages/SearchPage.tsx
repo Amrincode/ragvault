@@ -113,7 +113,7 @@ export function SearchPage() {
         . Everything runs locally.
       </p>
       <form
-        className="mt-7 space-y-5 rounded-2xl border border-line bg-white p-6"
+        className="mt-7 space-y-5 rounded-2xl border border-line bg-surface p-6"
         onSubmit={(event) => {
           event.preventDefault()
           void search()
@@ -124,7 +124,7 @@ export function SearchPage() {
         </label>
         <textarea
           id="search-query"
-          className="w-full rounded-xl border border-line p-3 text-sm"
+          className="w-full rounded-xl border border-control-border p-3 text-sm"
           rows={3}
           maxLength={2000}
           placeholder="How does the document describe data backups?"
@@ -136,7 +136,7 @@ export function SearchPage() {
           <label className="min-w-40 flex-1 text-xs font-medium">
             Collection
             <select
-              className="mt-2 block w-full rounded-lg border border-line p-2"
+              className="mt-2 block w-full rounded-lg border border-control-border p-2"
               aria-label="Collection filter"
               value={collection}
               disabled={busy || loadingFilters}
@@ -160,7 +160,7 @@ export function SearchPage() {
           <label className="min-w-40 flex-1 text-xs font-medium">
             Document
             <select
-              className="mt-2 block w-full rounded-lg border border-line p-2"
+              className="mt-2 block w-full rounded-lg border border-control-border p-2"
               aria-label="Document filter"
               value={document}
               disabled={busy || loadingFilters}
@@ -184,7 +184,7 @@ export function SearchPage() {
               type="number"
               min={1}
               max={20}
-              className="mt-2 block w-20 rounded-lg border border-line p-2"
+              className="mt-2 block w-20 rounded-lg border border-control-border p-2"
               value={topK}
               disabled={busy}
               onChange={(event) => setTopK(Number(event.target.value))}
@@ -252,14 +252,14 @@ export function SearchPage() {
             {result.model}
           </p>
           {result.incompatible_documents > 0 && (
-            <p className="mb-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+            <p className="mb-4 rounded-lg bg-warning-soft p-3 text-xs text-warning">
               {result.incompatible_documents} indexed documents use a different
               embedding model or settings and were excluded. Reindex them in
               Documents.
             </p>
           )}
           {!result.items.length ? (
-            <div className="rounded-xl border border-dashed border-line bg-white p-8 text-sm text-muted">
+            <div className="rounded-xl border border-dashed border-line bg-surface p-8 text-sm text-muted">
               No matching indexed passages. Process and index documents, check
               the filters, or try another question.
             </div>
@@ -268,7 +268,7 @@ export function SearchPage() {
               {result.items.map((hit) => (
                 <li
                   key={hit.chunk_id}
-                  className="rounded-xl border border-line bg-white p-5"
+                  className="rounded-xl border border-line bg-surface p-5"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>

@@ -324,7 +324,7 @@ function ConversationWorkspace() {
       <div className="mt-4 grid gap-4 lg:grid-cols-[14rem_minmax(0,1fr)]">
         <aside
           aria-label="Conversations"
-          className="rounded-xl border border-line bg-white p-4"
+          className="rounded-xl border border-line bg-surface p-4"
         >
           <button
             type="button"
@@ -382,7 +382,7 @@ function ConversationWorkspace() {
           )}
         </aside>
         <section
-          className={`min-w-0 rounded-xl border border-line bg-white p-4 ${selected ? 'flex h-[75dvh] min-h-[26rem] flex-col lg:h-[calc(100dvh-14rem)]' : ''}`}
+          className={`min-w-0 rounded-xl border border-line bg-surface p-4 ${selected ? 'flex h-[75dvh] min-h-[26rem] flex-col lg:h-[calc(100dvh-14rem)]' : ''}`}
           aria-label="Current conversation"
         >
           {error && (
@@ -578,7 +578,7 @@ function ConversationWorkspace() {
                     {messages.map((message) => (
                       <li
                         key={message.id}
-                        className={`rounded-xl p-4 ${message.role === 'user' ? 'ml-6 bg-mint/20' : 'mr-3 bg-white'}`}
+                        className={`rounded-xl p-4 ${message.role === 'user' ? 'ml-6 bg-mint/20' : 'mr-3 bg-surface'}`}
                       >
                         <p className="text-xs font-semibold">
                           {message.role === 'user' ? 'You' : 'Assistant'} ·{' '}
@@ -667,7 +667,7 @@ function ConversationWorkspace() {
                           m.role === 'assistant',
                       ) && (
                         <li
-                          className="mr-3 rounded-xl bg-white p-4"
+                          className="mr-3 rounded-xl bg-surface p-4"
                           role="status"
                         >
                           <p className="text-xs font-semibold">Assistant</p>
