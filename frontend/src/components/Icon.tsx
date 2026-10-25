@@ -1,6 +1,9 @@
 import type { CSSProperties } from 'react'
 
 const paths = {
+  menu: 'M4 6h16M4 12h16M4 18h16',
+  close: 'm6 6 12 12M6 18 18 6',
+  appearance: 'M12 3a9 9 0 1 0 0 18V3Zm0 0a9 9 0 0 1 0 18',
   search: 'M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z',
   plus: 'M12 5v14M5 12h14',
   upload: 'M12 16V3m-5 5 5-5 5 5M4 16v5h16v-5',

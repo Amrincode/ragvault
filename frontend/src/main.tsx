@@ -6,6 +6,7 @@ import { DocumentsPage } from './pages/DocumentsPage'
 import { SearchPage } from './pages/SearchPage'
 import { ChatPage } from './pages/ChatPage'
 import { ThemeProvider } from './theme/ThemeProvider'
+import { RouteFocus } from './components/RouteFocus'
 import './styles.css'
 
 const DesignSystemPreview = import.meta.env.DEV
@@ -16,6 +17,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
       <BrowserRouter>
+        <RouteFocus />
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/documents" element={<DocumentsPage />} />

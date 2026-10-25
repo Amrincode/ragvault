@@ -1,245 +1,399 @@
+import { Link } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { Icon, type IconName } from '../components/Icon'
 import { StatusBadge } from '../components/StatusBadge'
+import { Badge } from '../components/ui/Badge'
+import { Button } from '../components/ui/Button'
+import { Card } from '../components/ui/Card'
+import { EmptyState } from '../components/ui/EmptyState'
+import { LoadingIndicator } from '../components/ui/LoadingIndicator'
 import { useHealth } from '../hooks/useHealth'
-import { apiBaseUrl } from '../lib/api'
-import { Link } from 'react-router'
+import { useDashboard } from '../hooks/useDashboard'
+import { formatBytes } from '../lib/format'
 
+const actions: {
+  title: string
+  description: string
+  to: string
+  icon: IconName
+}[] = [
+  {
+    title: 'Upload documents',
+    description: 'Choose a collection and add your PDFs.',
+    to: '/documents',
+    icon: 'upload',
+  },
+  {
+    title: 'Browse documents',
+    description: 'Organize, preview and index your library.',
+    to: '/documents',
+    icon: 'documents',
+  },
+  {
+    title: 'Semantic search',
+    description: 'Find relevant passages in indexed PDFs.',
+    to: '/search',
+    icon: 'search',
+  },
+  {
+    title: 'Document chat',
+    description: 'Ask questions and inspect cited sources.',
+    to: '/chat',
+    icon: 'chat',
+  },
+]
+function Metric({
+  title,
+  value,
+  loading,
+  error,
+  icon,
+}: {
+  title: string
+  value?: number
+  loading: boolean
+  error: boolean
+  icon: IconName
+}) {
+  return (
+    <Card className="p-5 sm:p-6" role="group" aria-label={title}>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-medium text-muted">{title}</h2>
+        <Icon name={icon} className="text-accent" />
+      </div>
+      <div className="mt-4" aria-live="polite">
+        {loading ? (
+          <LoadingIndicator label="Loading total…" />
+        ) : error ? (
+          <p className="text-sm text-muted">Unavailable</p>
+        ) : (
+          <p className="text-3xl font-semibold tracking-tight tabular-nums">
+            {value?.toLocaleString()}
+          </p>
+        )}
+      </div>
+    </Card>
+  )
+}
 export function DashboardPage() {
-  const { data, error, checking, checkedAt, refresh } = useHealth()
-  const state = (value?: 'connected' | 'unavailable') =>
-    checking ? 'checking' : (value ?? 'unknown')
+  const workspace = useDashboard()
+  const health = useHealth()
+  const hasError =
+    workspace.documents.error ||
+    workspace.collections.error ||
+    workspace.conversations.error
+  const loading =
+    workspace.documents.loading ||
+    workspace.collections.loading ||
+    workspace.conversations.loading
   const services: {
     name: string
     description: string
     icon: IconName
-    state: ReturnType<typeof state>
+    state: 'checking' | 'connected' | 'unavailable' | 'unknown'
   }[] = [
     {
       name: 'FastAPI',
       description: 'Application server',
       icon: 'server',
-      state: checking ? 'checking' : data ? 'connected' : 'unavailable',
+      state: health.checking
+        ? 'checking'
+        : health.data
+          ? 'connected'
+          : 'unavailable',
     },
     {
       name: 'PostgreSQL',
       description: 'Database connection',
       icon: 'database',
-      state: state(data?.database.status),
+      state: health.checking
+        ? 'checking'
+        : (health.data?.database.status ?? 'unknown'),
     },
     {
       name: 'Ollama',
-      description: 'Local runtime connectivity',
+      description: 'Local AI runtime',
       icon: 'activity',
-      state: state(data?.ollama.status),
+      state: health.checking
+        ? 'checking'
+        : (health.data?.ollama.status ?? 'unknown'),
     },
   ]
-
   return (
     <AppShell>
-      <section id="overview" className="scroll-mt-8">
-        <div className="flex flex-wrap items-end justify-between gap-5">
+      <section aria-labelledby="dashboard-title">
+        <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
-            <p className="eyebrow">YOUR LOCAL INTELLIGENCE WORKSPACE</p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-              Your knowledge, close at hand.
+            <p className="eyebrow">YOUR WORKSPACE</p>
+            <h1 id="dashboard-title" className="mt-2 text-page">
+              Dashboard
             </h1>
             <p className="mt-3 max-w-xl text-sm leading-6 text-muted">
-              Welcome to RAGVault. Your document intelligence workspace
-              <br className="hidden xl:block" /> starts with a connected,
-              dependable foundation.
+              Your documents, conversations and local AI, in one place.
             </p>
           </div>
-          <a
-            href="#system-health"
-            className="inline-flex items-center gap-2 text-xs font-semibold text-forest"
+          <Link className="button" data-variant="primary" to="/documents">
+            <Icon name="upload" />
+            Upload documents
+          </Link>
+        </div>
+        <p className="mt-4 text-meta text-muted">
+          Uploads start in the document library. Choose or create a collection
+          to add a PDF.
+        </p>
+        <div className="mt-7 grid gap-4 sm:grid-cols-3">
+          <Metric
+            title="Total documents"
+            icon="documents"
+            value={workspace.documents.data?.total}
+            loading={workspace.documents.loading}
+            error={workspace.documents.error}
+          />
+          <Metric
+            title="Collections"
+            icon="vault"
+            value={workspace.collections.data?.length}
+            loading={workspace.collections.loading}
+            error={workspace.collections.error}
+          />
+          <Metric
+            title="Saved conversations"
+            icon="chat"
+            value={workspace.conversations.data?.total}
+            loading={workspace.conversations.loading}
+            error={workspace.conversations.error}
+          />
+        </div>
+        {hasError && (
+          <div
+            role="status"
+            className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-control border border-warning-border bg-warning-soft p-4 text-sm text-warning"
           >
-            View system health
-            <Icon name="arrow" className="size-4" />
-          </a>
-        </div>
-
-        <div className="relative mt-8 overflow-hidden rounded-2xl bg-nav p-7 text-nav-ink sm:p-8">
-          <div className="pointer-events-none absolute -right-12 -top-24 size-80 rounded-full border border-white/10" />
-          <div className="pointer-events-none absolute -right-2 -top-14 size-60 rounded-full border border-white/10" />
-          <div className="pointer-events-none absolute right-10 -top-2 size-36 rounded-full border border-white/10" />
-          <div className="relative">
-            <span className="inline-flex items-center gap-2 text-[10px] font-semibold tracking-[0.18em] text-mint">
-              <span className="size-1.5 rounded-full bg-mint" />
-              MILESTONE 07 · SAVED CONVERSATIONS
-            </span>
-            <h2 className="mt-4 text-xl font-medium tracking-tight">
-              A home for your original documents.
-            </h2>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-nav-muted">
-              Organize PDFs into collections, preview originals, and manage your
-              library locally.
-              <br className="hidden sm:block" /> Process and index page-aware
-              chunks, then search passages or ask questions with local AI.
+            <p>
+              Some workspace data could not be loaded. Available sections are
+              still shown.
             </p>
-            <div className="mt-6 inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-xs text-mint">
-              <Icon name="check" className="size-3.5" />
-              Single-user · Local-only
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section
-        id="system-health"
-        className="mt-9 scroll-mt-8"
-        aria-labelledby="health-heading"
-      >
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <h2
-              id="health-heading"
-              className="text-base font-semibold text-ink"
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={loading}
+              onClick={workspace.reload}
             >
-              System health
-            </h2>
-            <span aria-live="polite" className="text-xs text-muted">
-              {checking
-                ? 'Checking services…'
-                : data?.status === 'ok'
-                  ? 'All services connected'
-                  : data
-                    ? 'Attention needed'
-                    : 'Backend unreachable'}
-            </span>
+              Retry workspace data
+            </Button>
           </div>
-          <button
-            type="button"
-            disabled={checking}
+        )}
+      </section>
+      <div className="mt-8 grid items-start gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(16rem,1fr)]">
+        <section aria-labelledby="recent-heading" className="min-w-0">
+          <Card className="overflow-hidden p-0">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-5 sm:px-6">
+              <div>
+                <h2 id="recent-heading" className="text-section">
+                  Recent documents
+                </h2>
+                <p className="mt-1 text-meta text-muted">Your latest uploads</p>
+              </div>
+              <Link
+                to="/documents"
+                className="text-sm font-semibold text-accent hover:underline"
+              >
+                View library<span className="sr-only"> of documents</span>
+              </Link>
+            </div>
+            {workspace.documents.loading ? (
+              <div className="p-6">
+                <LoadingIndicator label="Loading recent documents…" />
+              </div>
+            ) : workspace.documents.error ? (
+              <div role="status" className="p-6 text-sm text-muted">
+                Recent documents are unavailable. Retry workspace data to check
+                again.
+              </div>
+            ) : !workspace.documents.data?.items.length ? (
+              <EmptyState
+                title="Your library starts here"
+                description="Add a PDF to a collection, then process and index it for search and grounded chat."
+                icon={<Icon name="documents" />}
+                action={
+                  <Link
+                    to="/documents"
+                    className="button"
+                    data-variant="primary"
+                  >
+                    Add your first document
+                  </Link>
+                }
+              />
+            ) : (
+              <ul className="divide-y divide-line">
+                {workspace.documents.data.items.slice(0, 5).map((doc) => {
+                  const collection = workspace.collections.data?.find(
+                    (item) => item.id === doc.collection_id,
+                  )
+                  const status =
+                    doc.indexing_status === 'indexed'
+                      ? 'Indexed'
+                      : doc.indexing_status === 'indexing'
+                        ? 'Indexing'
+                        : doc.indexing_status === 'failed'
+                          ? 'Indexing failed'
+                          : {
+                              uploaded: 'Uploaded',
+                              processing: 'Processing',
+                              processed: 'Processed',
+                              failed: 'Processing failed',
+                              no_text: 'No text',
+                            }[doc.processing_status]
+                  return (
+                    <li
+                      key={doc.id}
+                      className="flex min-w-0 items-start gap-3 p-5 sm:px-6"
+                    >
+                      <span className="grid size-10 shrink-0 place-items-center rounded-control bg-accent-soft text-accent">
+                        <Icon name="documents" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="break-words text-sm font-semibold [overflow-wrap:anywhere]">
+                          {doc.filename}
+                        </h3>
+                        <p className="mt-1 break-words text-meta text-muted [overflow-wrap:anywhere]">
+                          {collection ? `${collection.name} · ` : ''}
+                          {formatBytes(doc.file_size)} ·{' '}
+                          <time dateTime={doc.created_at}>
+                            {new Date(doc.created_at).toLocaleDateString(
+                              undefined,
+                              {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                              },
+                            )}
+                          </time>
+                        </p>
+                        <div className="mt-2">
+                          <Badge
+                            tone={
+                              status === 'Indexed'
+                                ? 'success'
+                                : status.includes('failed')
+                                  ? 'danger'
+                                  : 'neutral'
+                            }
+                          >
+                            {status}
+                          </Badge>
+                        </div>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+            <p className="border-t border-line px-5 py-4 text-meta text-muted sm:px-6">
+              Preview, process and manage documents in the{' '}
+              <Link
+                to="/documents"
+                className="font-medium text-accent hover:underline"
+              >
+                document library
+              </Link>
+              .
+            </p>
+          </Card>
+        </section>
+        <section aria-labelledby="actions-heading">
+          <Card className="p-5 sm:p-6">
+            <h2 id="actions-heading" className="text-section">
+              Quick actions
+            </h2>
+            <div className="mt-4 flex flex-col gap-1">
+              {actions.map((action) => (
+                <Link
+                  key={action.title}
+                  to={action.to}
+                  className="group flex items-start gap-3 rounded-control px-2 py-3 hover:bg-canvas"
+                >
+                  <Icon name={action.icon} className="mt-0.5 text-accent" />
+                  <span className="min-w-0 flex-1">
+                    <span className="text-sm font-semibold group-hover:text-accent">
+                      {action.title}
+                    </span>
+                    <span className="mt-1 block text-meta text-muted">
+                      {action.description}
+                    </span>
+                  </span>
+                  <Icon name="arrow" className="mt-0.5 size-4 text-muted" />
+                </Link>
+              ))}
+            </div>
+          </Card>
+          <p className="mt-4 px-1 text-meta leading-5 text-muted">
+            AI answers can be incomplete or incorrect. Review citations and
+            original pages.
+          </p>
+        </section>
+      </div>
+      <section className="mt-8" aria-labelledby="health-heading">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 id="health-heading" className="text-section">
+              System status
+            </h2>
+            <p aria-live="polite" className="mt-1 text-meta text-muted">
+              {health.checking
+                ? 'Checking services…'
+                : health.data?.status === 'ok'
+                  ? 'All services connected'
+                  : health.data
+                    ? 'Some services need attention'
+                    : 'Backend health could not be checked'}
+            </p>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            loading={health.checking}
             onClick={() => {
-              void refresh()
+              void health.refresh()
             }}
-            className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-xs font-medium text-ink transition hover:bg-canvas disabled:cursor-wait disabled:opacity-50"
           >
-            <Icon
-              name="refresh"
-              className={`size-3.5 ${checking ? 'animate-spin' : ''}`}
-            />
-            Refresh
-          </button>
+            <Icon name="refresh" className="size-4" />
+            Refresh status
+          </Button>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
           {services.map((service) => (
-            <div
-              key={service.name}
-              className="rounded-xl border border-line bg-surface p-5"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="grid size-10 place-items-center rounded-xl bg-canvas text-forest">
-                  <Icon name={service.icon} />
-                </span>
+            <Card key={service.name} className="p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <Icon name={service.icon} className="text-muted" />
                 <StatusBadge state={service.state} />
               </div>
-              <h3 className="mt-5 text-sm font-semibold text-ink">
-                {service.name}
-              </h3>
-              <p className="mt-1 text-xs text-muted">{service.description}</p>
-            </div>
+              <h3 className="mt-4 text-sm font-semibold">{service.name}</h3>
+              <p className="mt-1 text-meta text-muted">{service.description}</p>
+            </Card>
           ))}
         </div>
-        {error && (
-          <div
-            role="alert"
-            className="mt-3 rounded-lg border border-warning-border bg-warning-soft p-3 text-xs leading-5 text-warning"
-          >
-            Cannot read backend health. Start the API and check the configured
-            URL and CORS origin. {error}
-          </div>
+        {health.error && (
+          <p role="status" className="mt-3 text-sm text-warning">
+            The health check failed. The API may be offline or unreachable;
+            dependency status is unknown. Retry with Refresh status.
+          </p>
         )}
-        {data?.status === 'degraded' && (
-          <div
-            role="status"
-            className="mt-3 rounded-lg border border-warning-border bg-warning-soft p-3 text-xs leading-5 text-warning"
-          >
-            The API is running.{' '}
-            {data.database.detail ? `${data.database.detail}. ` : ''}
-            {data.ollama.detail ? `${data.ollama.detail}.` : ''}
-          </div>
+        {health.data?.status === 'degraded' && (
+          <p role="status" className="mt-3 text-sm text-warning">
+            The API is reachable, but a dependency is unavailable. Search or AI
+            answers may be affected.
+          </p>
         )}
-        <div className="mt-3 flex flex-wrap justify-between gap-2 text-[10px] text-muted">
-          <span className="font-mono">GET {apiBaseUrl}/api/health</span>
-          <span>
-            {checkedAt
-              ? `Last checked ${checkedAt.toLocaleTimeString()}`
-              : 'Waiting for first check'}{' '}
-            · Refreshes every 30s
-          </span>
-        </div>
+        <p className="mt-3 text-meta text-muted">
+          {health.checkedAt
+            ? `Last checked ${health.checkedAt.toLocaleTimeString()}`
+            : 'Waiting for first check'}{' '}
+          · Automatically checks every 30 seconds. Connectivity does not confirm
+          model readiness.
+        </p>
       </section>
-
-      <section className="mt-9" aria-labelledby="workspace-heading">
-        <div className="mb-4 flex items-center justify-between">
-          <h2
-            id="workspace-heading"
-            className="text-base font-semibold text-ink"
-          >
-            Your workspace
-          </h2>
-          <span className="text-xs text-muted">Built in milestones</span>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <article
-            id="documents"
-            className="scroll-mt-8 rounded-xl border border-line bg-surface p-6"
-          >
-            <div className="flex items-center justify-between">
-              <Icon name="documents" className="size-6 text-forest" />
-              <span className="rounded-md bg-success-soft px-2 py-1 text-[10px] font-medium text-success">
-                Available
-              </span>
-            </div>
-            <h3 className="mt-5 font-semibold text-ink">Documents</h3>
-            <p className="mt-2 max-w-sm text-sm leading-6 text-muted">
-              Create collections, upload validated PDFs, preview originals,
-              rename files, and manage your local library.
-            </p>
-            <p className="mt-5 border-t border-line pt-4 text-xs text-muted">
-              <Link
-                to="/documents"
-                className="font-semibold text-forest hover:underline"
-              >
-                Open document library →
-              </Link>
-            </p>
-          </article>
-          <article
-            id="chat"
-            className="scroll-mt-8 rounded-xl border border-line bg-surface p-6"
-          >
-            <div className="flex items-center justify-between">
-              <Icon name="chat" className="size-6 text-forest" />
-              <span className="rounded-md bg-success-soft px-2 py-1 text-[10px] font-medium text-success">
-                Available
-              </span>
-            </div>
-            <h3 className="mt-5 font-semibold text-ink">
-              Chat with your knowledge
-            </h3>
-            <p className="mt-2 max-w-sm text-sm leading-6 text-muted">
-              Ask questions about indexed PDFs. Inspect cited claims, supporting
-              excerpts and original pages. Source checks do not prove factual
-              truth. Save scoped discussions and ask contextual follow-ups.
-            </p>
-            <p className="mt-5 border-t border-line pt-4 text-xs text-muted">
-              <Link
-                to="/chat"
-                className="font-semibold text-forest hover:underline"
-              >
-                Open document chat →
-              </Link>
-            </p>
-          </article>
-        </div>
-      </section>
-      <footer className="mt-9 flex flex-wrap justify-between gap-2 border-t border-line pt-5 text-[10px] text-muted">
-        <span>RAGVault · Local-first document intelligence</span>
-        <span>React + FastAPI + PostgreSQL + Ollama</span>
-      </footer>
     </AppShell>
   )
 }

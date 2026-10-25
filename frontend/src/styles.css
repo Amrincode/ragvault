@@ -395,7 +395,7 @@
     @apply flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-medium transition;
   }
   .nav-item {
-    @apply flex items-center gap-3 rounded-lg px-3 py-3 text-xs font-medium transition;
+    @apply flex min-h-12 items-center gap-3 rounded-control px-3 py-3 text-sm font-medium transition;
   }
   .nav-item[aria-current='page'] {
     box-shadow: inset 3px 0 0 var(--ds-nav-accent);
@@ -412,4 +412,23 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+.navigation-drawer {
+  position: fixed;
+  inset: 0 auto 0 0;
+  margin: 0;
+  width: min(21rem, calc(100% - 1.5rem));
+  height: 100dvh;
+  max-height: 100dvh;
+  max-width: none;
+  overflow-y: auto;
+  border: 0;
+  border-right: 1px solid var(--ds-nav-line);
+  background: var(--ds-nav);
+  color: var(--ds-nav-ink);
+  padding: 0;
+}
+.navigation-drawer::backdrop {
+  background: color-mix(in srgb, var(--ds-overlay) 70%, transparent);
 }

@@ -1,8 +1,9 @@
-# RAGVault design system — Stage 8.1
+# RAGVault design system
 
-Stage 8.1 establishes shared styling, controls and themes. It does **not** complete the
-application redesign. Dashboard, Documents, Search, Chat and navigation retain their
-existing structure and behavior. See [verification and file inventory](verification-milestone-8-1.md).
+Stage 8.1 establishes shared styling, controls and themes. Stage 8.2 adds the shared
+navigation and dashboard redesign. Documents, Search, Chat and PDF contents retain their
+existing structure and behavior. See [Stage 8.1 verification](verification-milestone-8-1.md)
+and [Stage 8.2 verification and inventory](verification-milestone-8-2.md).
 
 ## Direction
 
@@ -51,7 +52,7 @@ Compatibility helpers `.primary-button`, `.secondary-button`, `.text-input`,
 `forest` aliases the surface accent; `mint` aliases the navigation accent. Filled
 navigation/action callers have been migrated to explicit `nav` / `primary` roles so
 these aliases do not produce unreadable dark-theme text. Literal white is retained for
-PDF paper and decorative translucent shapes on the navy dashboard panel.
+PDF paper.
 
 ## Typography, spacing and radius
 
@@ -118,8 +119,8 @@ when unmounted. Its elevated surface and overlay now use semantic roles.
   clearing storage resets to Light. Blocked storage falls back safely to in-memory use.
 - The bootstrap and provider deliberately have a small shared contract (key/modes/default);
   tests execute the actual bootstrap script and provider behavior to keep them aligned.
-- A minimal native Theme select is in the existing header. Its polished navigation
-  integration belongs to Stage 8.2. Tests/components outside a ThemeProvider do not show
+- A labeled native Theme select is integrated into the workspace header. It stays
+  available on mobile without opening navigation. Tests/components outside a ThemeProvider do not show
   a nonfunctional selector; production always mounts the provider at the root.
 
 ## Accessibility decisions
@@ -168,6 +169,6 @@ Use the shared controls or compatible legacy helpers, and retain accessible name
 props, loading states and refs. Recheck both themes, status colors and keyboard focus after
 each migration. Keep PDF/citation text plain and preserve all source/scope protections.
 
-Dashboard, Documents, Search, saved/stateless Chat, source/citation panels and specialized
-dialogs still need their page-specific redesigns. Stage 8.2 navigation has **not** begun.
+Documents, Search, saved/stateless Chat, source/citation panels and specialized dialogs
+still need their page-specific redesigns. Stage 8.2 covers navigation and Dashboard only.
 Do not infer new data, API or model behavior from a visual foundation change.
