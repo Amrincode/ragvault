@@ -2,10 +2,12 @@
 
 Stage 8.1 establishes shared styling, controls and themes. Stage 8.2 adds the shared
 navigation and dashboard redesign. Stage 8.3 extends it to the document library and
-upload/management controls. Search, Chat and PDF reader contents retain their existing
+upload/management controls. Stage 8.4 extends the shared styles to saved and unsaved chat,
+conversation history and compact citation presentation. Search and PDF reader contents retain their existing
 structure and behavior. See [Stage 8.1 verification](verification-milestone-8-1.md),
 [Stage 8.2 verification](verification-milestone-8-2.md) and
-[Stage 8.3 verification and inventory](verification-milestone-8-3.md).
+[Stage 8.3 verification and inventory](verification-milestone-8-3.md) and
+[Stage 8.4 verification and inventory](verification-milestone-8-4.md).
 
 ## Direction
 
@@ -171,9 +173,19 @@ Use the shared controls or compatible legacy helpers, and retain accessible name
 props, loading states and refs. Recheck both themes, status colors and keyboard focus after
 each migration. Keep PDF/citation text plain and preserve all source/scope protections.
 
-Search, saved/stateless Chat, source/citation panels and the PDF reader still need their
-page-specific redesigns. Stage 8.3 covers the document library only; it retains the
+Search and the PDF reader still need their page-specific redesigns. Stage 8.3 retains the
 existing preview and text-inspection behavior. Document technical metadata and rename/
 delete controls use an inline native details disclosure, not an overflow menu or popover.
-Recovery controls remain visible outside it. No Stage 8.4 work has begun.
+Recovery controls remain visible outside it. Stage 8.4 adds a desktop conversation panel,
+a native mobile history dialog, scoped creation controls, an anchored composer and clear
+user/assistant grouping. Long scope names expand on demand. Full message and source text
+wraps; timestamps expose the full date accessibly. Compact mobile button labels retain
+their complete accessible names.
+
+Accepted claims keep their original wording and numbered PDF controls. A single Sources
+disclosure per answer groups identical source/page/quote/check metadata, without merging
+different quotes or renumbering references. Partial, withheld and historical-source
+warnings remain explicit; detailed checks and withheld statements expand separately.
+Original excerpts and model output remain plain text. No retrieval, model, validation,
+scope or persistence contracts change. Stage 8.5 has not started.
 Do not infer new data, API or model behavior from a visual foundation change.

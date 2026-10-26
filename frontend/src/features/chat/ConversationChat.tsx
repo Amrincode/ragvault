@@ -9,7 +9,14 @@ import { Link, useSearchParams } from 'react-router'
 import { AppShell } from '../../components/AppShell'
 import { Dialog } from '../../components/Dialog'
 import { NameDialog, PreviewDialog } from '../documents/LibraryDialogs'
-import { ClaimAnswer } from './ClaimAnswer'
+import { ChatMessage } from './ChatMessage'
+import { ChatComposer } from './ChatComposer'
+import { ConversationHistory } from './ConversationHistory'
+import { Button } from '../../components/ui/Button'
+import { Input } from '../../components/ui/Input'
+import { FormField } from '../../components/ui/FormField'
+import { LoadingIndicator } from '../../components/ui/LoadingIndicator'
+import { Icon } from '../../components/Icon'
 import * as api from '../../lib/api'
 import type { ChatSource } from '../../types/chat'
 import type { Collection, Document, DocumentPage } from '../../types/library'
@@ -34,10 +41,25 @@ function mergeMessages(previous: SavedMessage[], incoming: SavedMessage[]) {
 
 export function ConversationChat() {
   const [params] = useSearchParams()
-  return <ConversationWorkspace key={params.get('conversation') || 'new'} />
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  return (
+    <ConversationWorkspace
+      key={params.get('conversation') || 'new'}
+      initialDraft={drafts[params.get('conversation') || ''] || ''}
+      onDraftChange={(id, value) =>
+        setDrafts((old) => ({ ...old, [id]: value }))
+      }
+    />
+  )
 }
 
-function ConversationWorkspace() {
+function ConversationWorkspace({
+  initialDraft,
+  onDraftChange,
+}: {
+  initialDraft: string
+  onDraftChange: (id: string, value: string) => void
+}) {
   const [params, setParams] = useSearchParams()
   const selected = params.get('conversation') || ''
   const selectedRef = useRef(selected)
@@ -50,7 +72,16 @@ function ConversationWorkspace() {
   const [loading, setLoading] = useState(!!selected)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [question, setQuestion] = useState('')
+  const [question, setQuestionValue] = useState(initialDraft)
+  function setQuestion(value: string) {
+    onDraftChange(selected, value)
+    setQuestionValue(value)
+  }
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const conversationHeading = useRef<HTMLHeadingElement>(null)
+  useLayoutEffect(() => {
+    conversationHeading.current?.focus()
+  }, [current?.id])
   const [topK, setTopK] = useState(5)
   const [title, setTitle] = useState('New conversation')
   const [collection, setCollection] = useState('')
@@ -188,6 +219,7 @@ function ConversationWorkspace() {
   )
 
   function choose(id: string) {
+    setHistoryOpen(false)
     setParams(id ? { conversation: id } : {})
   }
   async function create() {
@@ -209,7 +241,12 @@ function ConversationWorkspace() {
     }
   }
   async function send(check = false) {
-    if (!selected || busy) return
+    if (
+      !selected ||
+      busy ||
+      (!check && (current?.generating || !current?.scope_available))
+    )
+      return
     const id = selected
     const body =
       check && pending.current?.conversation === id
@@ -309,198 +346,204 @@ function ConversationWorkspace() {
     }
   }
 
+  const history = (
+    <ConversationHistory
+      list={list}
+      error={listError}
+      selected={selected}
+      offset={listOffset}
+      choose={choose}
+      retry={() => void reloadList()}
+      paginate={setListOffset}
+    />
+  )
   return (
     <AppShell page="Document chat" compact>
-      <h1 className="text-2xl font-semibold">Document chat</h1>
-      <p className="mt-1 text-sm text-muted">
-        Saved locally · answers use fresh PDF evidence.
-      </p>
-      <Link
-        className="mt-2 inline-block text-xs text-forest underline"
-        to="/chat?mode=single"
-      >
-        Single question · without saving
-      </Link>
-      <div className="mt-4 grid gap-4 lg:grid-cols-[14rem_minmax(0,1fr)]">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="eyebrow">DOCUMENT WORKSPACE</p>
+          <h1 className="mt-1 text-page font-semibold">Document chat</h1>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant="secondary"
+            className="lg:hidden"
+            aria-haspopup="dialog"
+            aria-label="Conversation history"
+            aria-expanded={historyOpen}
+            onClick={() => setHistoryOpen(true)}
+          >
+            <Icon name="chat" />
+            <span aria-hidden="true" className="sm:hidden">
+              History
+            </span>
+            <span aria-hidden="true" className="hidden sm:inline">
+              Conversation history
+            </span>
+          </Button>
+          <Link
+            className="min-h-10 rounded-control px-2 py-2 text-sm font-medium text-accent underline underline-offset-4"
+            to="/chat?mode=single"
+            aria-label="Single question - without saving"
+          >
+            <span className="sm:hidden">Single question</span>
+            <span className="hidden sm:inline">
+              Single question · without saving
+            </span>
+          </Link>
+        </div>
+      </div>
+      <div className="grid min-w-0 gap-4 lg:grid-cols-[13.5rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)]">
         <aside
           aria-label="Conversations"
-          className="rounded-xl border border-line bg-surface p-4"
+          className="hidden h-[calc(100dvh-12rem)] min-h-96 rounded-card border border-line bg-surface p-4 lg:block"
         >
-          <button
-            type="button"
-            className="primary-button w-full"
-            onClick={() => choose('')}
-          >
-            New conversation
-          </button>
-          {listError && (
-            <p role="alert" className="error-message">
-              {listError}{' '}
-              <button onClick={() => void reloadList()}>
-                Retry conversation list
-              </button>
-            </p>
-          )}
-          {!list && !listError && <p role="status">Loading conversations…</p>}
-          {list?.total === 0 && (
-            <p className="mt-4 text-sm text-muted">No conversations yet.</p>
-          )}
-          <ul className="mt-4 max-h-40 space-y-2 overflow-auto lg:max-h-[45vh]">
-            {list?.items.map((item) => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  aria-pressed={selected === item.id}
-                  onClick={() => choose(item.id)}
-                  className="w-full break-words rounded-lg border border-line p-3 text-left text-sm aria-pressed:bg-mint/20"
-                >
-                  {item.title}
-                  <span className="mt-1 block text-xs text-muted">
-                    {item.generating
-                      ? 'Generating…'
-                      : new Date(item.updated_at).toLocaleString()}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-          {list && list.total > 20 && (
-            <div className="mt-4 flex justify-between text-sm">
-              <button
-                disabled={listOffset === 0}
-                onClick={() => setListOffset(Math.max(0, listOffset - 20))}
-              >
-                Previous conversations
-              </button>
-              <button
-                disabled={listOffset + 20 >= list.total}
-                onClick={() => setListOffset(listOffset + 20)}
-              >
-                Next conversations
-              </button>
-            </div>
-          )}
+          {history}
         </aside>
         <section
-          className={`min-w-0 rounded-xl border border-line bg-surface p-4 ${selected ? 'flex h-[75dvh] min-h-[26rem] flex-col lg:h-[calc(100dvh-14rem)]' : ''}`}
+          className={`min-w-0 overflow-hidden rounded-card border border-line bg-surface ${selected ? 'flex h-[calc(100dvh-16rem)] min-h-[30rem] flex-col lg:h-[calc(100dvh-12rem)]' : ''}`}
           aria-label="Current conversation"
         >
           {error && (
-            <p role="alert" className="error-message">
+            <p role="alert" className="error-message m-3">
               {error}
             </p>
           )}
           {!selected ? (
-            <form
-              onSubmit={(event) => {
-                event.preventDefault()
-                void create()
-              }}
-              className="space-y-4"
-            >
-              <h2 className="text-lg font-semibold">
+            <div className="mx-auto max-w-xl px-5 py-8 sm:p-8">
+              <span className="mb-5 inline-grid size-12 place-items-center rounded-card border border-line bg-accent-soft text-accent">
+                <Icon name="chat" className="size-6" />
+              </span>
+              <h2
+                ref={conversationHeading}
+                tabIndex={-1}
+                className="text-section font-semibold"
+              >
                 Start a saved conversation
               </h2>
-              <label className="block text-sm">
-                Conversation title
-                <input
-                  className="text-input mt-1"
-                  value={title}
-                  maxLength={120}
-                  required
-                  disabled={busy}
-                  onChange={(event) => setTitle(event.target.value)}
-                />
-              </label>
-              <label className="block text-sm">
-                Collection scope
-                <select
-                  aria-label="Collection scope"
-                  className="text-input mt-1"
-                  value={collection}
-                  disabled={busy}
-                  onChange={(event) => {
-                    setCollection(event.target.value)
-                    setDocuments(null)
-                    setDocument('')
-                    setDocOffset(0)
-                  }}
-                >
-                  <option value="">All collections</option>
-                  {collections.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block text-sm">
-                Document scope
-                <select
-                  aria-label="Document scope"
-                  className="text-input mt-1"
-                  value={document}
-                  disabled={busy || !documents}
-                  onChange={(event) => setDocument(event.target.value)}
-                >
-                  <option value="">All documents</option>
-                  {documents?.items.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.filename}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {documents && documents.total > 100 && (
-                <div className="flex gap-4 text-sm">
-                  <button
-                    type="button"
-                    disabled={!docOffset}
-                    onClick={() => {
-                      setDocOffset(Math.max(0, docOffset - 100))
-                      setDocuments(null)
-                      setDocument('')
-                    }}
-                  >
-                    Previous scope documents
-                  </button>
-                  <button
-                    type="button"
-                    disabled={docOffset + 100 >= documents.total}
-                    onClick={() => {
-                      setDocOffset(docOffset + 100)
-                      setDocuments(null)
-                      setDocument('')
-                    }}
-                  >
-                    More scope documents
-                  </button>
-                </div>
-              )}
-              {scopeError && (
-                <p role="alert" className="error-message">
-                  {scopeError}
-                </p>
-              )}
-              <p className="text-xs text-muted">
-                Scope is fixed after creation. If a scoped document is deleted,
-                this discussion stays readable but cannot retrieve from a
-                broader scope.
+              <p className="mt-2 text-sm leading-6 text-muted">
+                Give your discussion a name and choose which indexed PDFs it can
+                use. Ask focused questions and follow up with fresh document
+                evidence.
               </p>
-              <button
-                className="primary-button"
-                disabled={busy || !documents || !!scopeError || !title.trim()}
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  if (!busy && documents && !scopeError && title.trim())
+                    void create()
+                }}
+                className="mt-6 space-y-5"
               >
-                {busy ? 'Creating…' : 'Create conversation'}
-              </button>
-            </form>
+                <FormField label="Conversation title">
+                  <Input
+                    value={title}
+                    maxLength={120}
+                    required
+                    disabled={busy}
+                    onChange={(event) => setTitle(event.target.value)}
+                  />
+                </FormField>
+                <FormField label="Collection scope">
+                  <select
+                    className="text-input min-w-0"
+                    value={collection}
+                    disabled={busy}
+                    onChange={(event) => {
+                      setCollection(event.target.value)
+                      setDocuments(null)
+                      setDocument('')
+                      setDocOffset(0)
+                    }}
+                  >
+                    <option value="">All collections</option>
+                    {collections.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+                <FormField label="Document scope">
+                  <select
+                    className="text-input min-w-0"
+                    value={document}
+                    disabled={busy || !documents}
+                    onChange={(event) => setDocument(event.target.value)}
+                  >
+                    <option value="">All documents</option>
+                    {documents?.items.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.filename}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+                {documents && documents.total > 100 && (
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={!docOffset}
+                      onClick={() => {
+                        setDocOffset(Math.max(0, docOffset - 100))
+                        setDocuments(null)
+                        setDocument('')
+                      }}
+                    >
+                      Previous scope documents
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={docOffset + 100 >= documents.total}
+                      onClick={() => {
+                        setDocOffset(docOffset + 100)
+                        setDocuments(null)
+                        setDocument('')
+                      }}
+                    >
+                      More scope documents
+                    </Button>
+                  </div>
+                )}
+                {scopeError && (
+                  <p role="alert" className="error-message">
+                    {scopeError}
+                  </p>
+                )}
+                {!documents && !scopeError && (
+                  <LoadingIndicator label="Loading document scopes…" />
+                )}
+                <div className="rounded-control border border-line bg-canvas p-4 text-sm leading-6 text-muted">
+                  <p className="flex items-center gap-2 font-medium text-ink">
+                    <Icon name="lock" className="size-4" />
+                    Scope is fixed after creation
+                  </p>
+                  <p className="mt-1">
+                    If a scoped document is deleted, this discussion stays
+                    readable but cannot retrieve from a broader scope.
+                  </p>
+                </div>
+                <Button
+                  type="submit"
+                  loading={busy}
+                  disabled={!documents || !!scopeError || !title.trim()}
+                >
+                  {busy ? 'Creating…' : 'Create conversation'}
+                </Button>
+              </form>
+            </div>
           ) : (
             <>
               {loading && !current && (
-                <p role="status">Loading saved messages…</p>
+                <div className="p-6">
+                  <LoadingIndicator label="Loading saved messages…" />
+                </div>
               )}
               {error && !current && (
-                <button
+                <Button
+                  variant="secondary"
+                  className="m-4 self-start"
                   onClick={() =>
                     void refresh(selected).catch((cause) =>
                       setError(explain(cause)),
@@ -508,54 +551,103 @@ function ConversationWorkspace() {
                   }
                 >
                   Retry loading conversation
-                </button>
+                </Button>
               )}
               {current && (
                 <>
-                  <h2 className="break-words text-lg font-semibold">
-                    {current.title}
-                  </h2>
-                  <p className="mt-2 break-words text-xs text-muted">
-                    {current.scope_label}
-                  </p>
-                  {!current.scope_available && (
-                    <p role="status" className="error-message">
-                      Original scope unavailable. Create a new conversation to
-                      select different documents.
-                    </p>
-                  )}
-                  <div className="my-2 flex flex-wrap gap-4 text-xs">
-                    <button
-                      disabled={busy || current.generating}
-                      onClick={() => setEditing(true)}
+                  <div className="shrink-0 border-b border-line p-4 sm:px-6">
+                    <h2
+                      ref={conversationHeading}
+                      tabIndex={-1}
+                      className="line-clamp-2 break-words text-section font-semibold [overflow-wrap:anywhere]"
+                      title={current.title}
                     >
-                      Rename conversation
-                    </button>
-                    <button
-                      disabled={busy || current.generating}
-                      onClick={() => setDeleting(true)}
-                    >
-                      Delete conversation
-                    </button>
-                    <button
-                      onClick={() =>
-                        void refresh(selected).catch((cause) =>
-                          setError(explain(cause)),
-                        )
-                      }
-                    >
-                      Refresh messages
-                    </button>
+                      {current.title}
+                    </h2>
+                    <details className="mt-1 text-meta text-muted">
+                      <summary
+                        className="cursor-pointer"
+                        aria-label={`Evidence scope: ${current.scope_label}`}
+                      >
+                        <span className="inline-block max-w-[calc(100%-1.5rem)] truncate align-bottom">
+                          {current.scope_label}
+                        </span>
+                      </summary>
+                      <div className="mt-2 space-y-1 break-words rounded-control border border-line bg-canvas p-3 [overflow-wrap:anywhere]">
+                        <p>Full title: {current.title}</p>
+                        <p>Selected evidence: {current.scope_label}</p>
+                        <p>
+                          Scope is fixed. Each new turn retrieves evidence only
+                          within this scope.
+                        </p>
+                      </div>
+                    </details>
+                    {!current.scope_available && (
+                      <p role="status" className="error-message">
+                        Original scope unavailable. Create a new conversation to
+                        select different documents.
+                      </p>
+                    )}
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={busy || current.generating}
+                        aria-label="Rename conversation"
+                        onClick={() => setEditing(true)}
+                      >
+                        <span aria-hidden="true" className="sm:hidden">
+                          Rename
+                        </span>
+                        <span aria-hidden="true" className="hidden sm:inline">
+                          Rename conversation
+                        </span>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={busy || current.generating}
+                        aria-label="Delete conversation"
+                        onClick={() => setDeleting(true)}
+                      >
+                        <span aria-hidden="true" className="sm:hidden">
+                          Delete
+                        </span>
+                        <span aria-hidden="true" className="hidden sm:inline">
+                          Delete conversation
+                        </span>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label="Refresh messages"
+                        onClick={() =>
+                          void refresh(selected).catch((cause) =>
+                            setError(explain(cause)),
+                          )
+                        }
+                      >
+                        <span aria-hidden="true" className="sm:hidden">
+                          Refresh
+                        </span>
+                        <span aria-hidden="true" className="hidden sm:inline">
+                          Refresh messages
+                        </span>
+                      </Button>
+                    </div>
+                    {messages.length < total && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={loading}
+                        onClick={() => void older()}
+                      >
+                        {loading
+                          ? 'Loading older messages…'
+                          : 'Load older messages'}
+                      </Button>
+                    )}
                   </div>
-                  {messages.length < total && (
-                    <button
-                      disabled={loading}
-                      onClick={() => void older()}
-                      className="mb-3 text-sm underline"
-                    >
-                      Load older messages
-                    </button>
-                  )}
                   <ol
                     ref={historyPane}
                     aria-label="Conversation messages"
@@ -568,82 +660,42 @@ function ConversationWorkspace() {
                       followLatest.current = nearLatest
                       setShowJump(!nearLatest)
                     }}
-                    className="min-h-0 flex-1 space-y-4 overflow-auto overscroll-contain rounded-lg border border-line bg-canvas p-3 [overflow-anchor:none]"
+                    className="min-h-0 flex-1 space-y-6 overflow-y-auto px-4 py-6 [overflow-anchor:none] [overflow-wrap:anywhere] sm:px-6 lg:px-8"
                   >
                     {messages.length === 0 && !submission && (
-                      <li className="text-sm text-muted">
-                        No messages yet. Ask about your selected PDFs.
+                      <li className="mx-auto max-w-sm py-8 text-center">
+                        <Icon
+                          name="documents"
+                          className="mx-auto mb-3 size-8 text-accent"
+                        />
+                        <p className="font-medium">
+                          Your documents, in conversation
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-muted">
+                          No messages yet. Ask about your selected PDFs. Review
+                          the cited original pages alongside each answer.
+                        </p>
                       </li>
                     )}
                     {messages.map((message) => (
-                      <li
+                      <ChatMessage
                         key={message.id}
-                        className={`rounded-xl p-4 ${message.role === 'user' ? 'ml-6 bg-mint/20' : 'mr-3 bg-surface'}`}
-                      >
-                        <p className="text-xs font-semibold">
-                          {message.role === 'user' ? 'You' : 'Assistant'} ·{' '}
-                          {new Date(message.created_at).toLocaleString()}
-                        </p>
-                        {message.status === 'pending' ? (
-                          <p role="status" className="mt-2 text-sm">
-                            Thinking · finding evidence in your PDFs…
-                          </p>
-                        ) : message.answer ? (
-                          <>
-                            {message.citation_state !== 'none' && (
-                              <details className="mt-2 text-xs text-muted">
-                                <summary className="cursor-pointer">
-                                  Saved source details ·{' '}
-                                  {message.citation_state}
-                                </summary>
-                                <p>
-                                  Historical source availability:{' '}
-                                  {message.citation_state}. Stored checks are
-                                  not a new factual verification.
-                                </p>
-                              </details>
-                            )}
-                            <ClaimAnswer
-                              result={message.answer}
-                              onOpenSource={(source) => void openSource(source)}
-                              allowSources={
-                                message.citation_state === 'available'
-                              }
-                              compact
-                            />
-                          </>
-                        ) : (
-                          <p className="mt-2 whitespace-pre-wrap break-words text-sm">
-                            {message.content}
-                          </p>
-                        )}
-                        {message.citation_state === 'invalid' &&
-                          !message.answer && (
-                            <p className="text-xs text-muted">
-                              Saved citation data is invalid; no citation links
-                              are available.
-                            </p>
-                          )}
-                        {message.status === 'failed' && (
-                          <button
-                            className="mt-3 text-sm underline"
-                            disabled={busy || current.generating}
-                            onClick={() => {
-                              setQuestion(
-                                messages.find(
-                                  (m) =>
-                                    m.request_id === message.request_id &&
-                                    m.role === 'user',
-                                )?.content || '',
-                              )
-                              pending.current = null
-                              setUnknownSubmission(false)
-                            }}
-                          >
-                            Retry question as a new turn
-                          </button>
-                        )}
-                      </li>
+                        message={message}
+                        disabled={busy || current.generating}
+                        openSource={(source) => void openSource(source)}
+                        retry={() => {
+                          setQuestion(
+                            messages.find(
+                              (m) =>
+                                m.request_id === message.request_id &&
+                                m.role === 'user',
+                            )?.content || '',
+                          )
+                          pending.current = null
+                          setUnknownSubmission(false)
+                          composer.current?.focus()
+                        }}
+                      />
                     ))}
                     {submission &&
                       !messages.some(
@@ -651,11 +703,11 @@ function ConversationWorkspace() {
                           m.request_id === submission.request_id &&
                           m.role === 'user',
                       ) && (
-                        <li className="ml-6 rounded-xl bg-mint/20 p-4">
-                          <p className="text-xs font-semibold">
+                        <li className="ml-auto w-fit max-w-[92%] rounded-card border border-line bg-accent-soft p-4">
+                          <p className="text-meta font-semibold">
                             You · submitting
                           </p>
-                          <p className="mt-2 whitespace-pre-wrap break-words text-sm">
+                          <p className="mt-2 whitespace-pre-wrap break-words text-body leading-7">
                             {submission.question}
                           </p>
                         </li>
@@ -666,123 +718,59 @@ function ConversationWorkspace() {
                           m.request_id === submission.request_id &&
                           m.role === 'assistant',
                       ) && (
-                        <li
-                          className="mr-3 rounded-xl bg-surface p-4"
-                          role="status"
-                        >
-                          <p className="text-xs font-semibold">Assistant</p>
-                          <p className="mt-2 text-sm">
+                        <li className="py-2" role="status">
+                          <p className="text-meta font-semibold">Assistant</p>
+                          <p className="mt-2 text-sm leading-6 text-muted">
                             {unknownSubmission && !busy
                               ? 'Submission status unknown. Check submission below to recover this turn.'
-                              : 'Thinking · finding evidence in your PDFs…'}
+                              : 'Thinking · finding evidence in your PDFs… Searching documents and generating a response; replies appear when complete.'}
                           </p>
                         </li>
                       )}
                   </ol>
                   {showJump && (
-                    <button
-                      type="button"
-                      className="mx-auto mt-2 rounded-full border border-line px-4 py-1 text-xs text-forest"
-                      onClick={jumpToLatest}
-                    >
-                      Jump to latest
-                    </button>
-                  )}
-                  <form
-                    className="mt-3 shrink-0 space-y-2"
-                    onSubmit={(event) => {
-                      event.preventDefault()
-                      void send()
-                    }}
-                  >
-                    <label className="block text-sm">
-                      Your question
-                      <textarea
-                        ref={composer}
-                        className="text-input mt-1"
-                        value={question}
-                        maxLength={2000}
-                        rows={2}
-                        disabled={
-                          busy ||
-                          current.generating ||
-                          !current.scope_available ||
-                          unknownSubmission
-                        }
-                        onChange={(event) => setQuestion(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (
-                            event.key === 'Enter' &&
-                            !event.shiftKey &&
-                            !event.nativeEvent.isComposing
-                          ) {
-                            event.preventDefault()
-                            if (
-                              !current.generating &&
-                              current.scope_available &&
-                              !unknownSubmission
-                            )
-                              void send()
-                          }
-                        }}
-                      />
-                    </label>
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <label className="block text-xs">
-                        Passages to retrieve
-                        <input
-                          type="number"
-                          className="text-input ml-3 max-w-20"
-                          min={1}
-                          max={20}
-                          value={topK}
-                          disabled={busy || current.generating}
-                          onChange={(event) =>
-                            setTopK(Number(event.target.value))
-                          }
-                        />
-                      </label>
-                      {unknownSubmission ? (
-                        <button
-                          type="button"
-                          className="primary-button"
-                          disabled={busy}
-                          onClick={() => void send(true)}
-                        >
-                          Check submission · reuse request key
-                        </button>
-                      ) : (
-                        <button
-                          className="primary-button"
-                          disabled={
-                            busy ||
-                            current.generating ||
-                            !current.scope_available ||
-                            !question.trim()
-                          }
-                        >
-                          {busy ? 'Saving and generating…' : 'Send question'}
-                        </button>
-                      )}
+                    <div className="flex justify-center border-t border-line py-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={jumpToLatest}
+                      >
+                        Jump to latest
+                      </Button>
                     </div>
-                    <details className="text-xs text-muted">
-                      <summary className="cursor-pointer">
-                        Enter to send · Shift+Enter for newline · retry details
-                      </summary>
-                      <p className="mt-1">
-                        Failed turns stay visible. Retry creates a new turn;
-                        uncertain submissions reuse their request key.
-                        Interrupted requests become retryable after the server's
-                        generation timeout.
-                      </p>
-                    </details>
-                  </form>
+                  )}
+                  <ChatComposer
+                    question={question}
+                    onQuestion={setQuestion}
+                    topK={topK}
+                    onTopK={setTopK}
+                    inputRef={composer}
+                    busy={busy}
+                    disabled={
+                      busy ||
+                      current.generating ||
+                      !current.scope_available ||
+                      unknownSubmission
+                    }
+                    onSend={() => void send()}
+                    recovery={
+                      unknownSubmission ? () => void send(true) : undefined
+                    }
+                  />
                 </>
               )}
             </>
           )}
         </section>
       </div>
+      {historyOpen && (
+        <Dialog
+          title="Conversation history"
+          onClose={() => setHistoryOpen(false)}
+        >
+          <div className="h-[min(65dvh,36rem)]">{history}</div>
+        </Dialog>
+      )}
       {editing && current && (
         <NameDialog
           title="Rename conversation"
@@ -812,7 +800,8 @@ function ConversationWorkspace() {
             </button>
             <button
               disabled={busy}
-              className="primary-button"
+              className="button"
+              data-variant="danger"
               onClick={() => void destroy()}
             >
               Confirm deletion

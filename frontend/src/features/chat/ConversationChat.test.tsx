@@ -634,4 +634,189 @@ describe('Saved conversations', () => {
       view.container.querySelector('img[src="x"],a[href="https://evil.test"]'),
     ).toBeNull()
   })
+  it('preserves per-conversation unsent drafts when selecting another history entry', async () => {
+    mount()
+    await loaded()
+    await userEvent.type(
+      screen.getByLabelText('Your question'),
+      'Unsent safety question',
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: /Finance discussion/ }),
+    )
+    await screen.findByRole('heading', { name: second.title })
+    expect(screen.getByLabelText('Your question')).toHaveValue('')
+    await userEvent.type(
+      screen.getByLabelText('Your question'),
+      'Unsent finance question',
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: /Safety discussion/ }),
+    )
+    expect(
+      await screen.findByRole('heading', { name: first.title }),
+    ).toHaveFocus()
+    expect(screen.getByLabelText('Your question')).toHaveValue(
+      'Unsent safety question',
+    )
+    expect(api.askConversation).not.toHaveBeenCalled()
+  })
+  it('opens a labeled mobile history dialog and restores focus on Escape', async () => {
+    mount()
+    await loaded()
+    const trigger = screen.getByRole('button', { name: 'Conversation history' })
+    await userEvent.click(trigger)
+    const dialog = screen.getByRole('dialog', { name: 'Conversation history' })
+    expect(
+      within(dialog).getByRole('button', { name: 'Close dialog' }),
+    ).toHaveFocus()
+    fireEvent(dialog, new Event('cancel', { bubbles: true, cancelable: true }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(trigger).toHaveFocus()
+  })
+  it('selects a conversation through mobile history and focuses its heading', async () => {
+    mount()
+    await loaded()
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Conversation history' }),
+    )
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: /Finance discussion/,
+      }),
+    )
+    expect(
+      await screen.findByRole('heading', { name: second.title }),
+    ).toHaveFocus()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+  it('keeps history pagination available without issuing any generation requests', async () => {
+    vi.mocked(api.listConversations).mockResolvedValue({
+      items: [first],
+      total: 41,
+      offset: 0,
+      limit: 20,
+    })
+    mount()
+    await loaded()
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Next conversations' }),
+    )
+    await waitFor(() =>
+      expect(api.listConversations).toHaveBeenLastCalledWith(
+        20,
+        expect.any(AbortSignal),
+      ),
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Previous conversations' }),
+    )
+    await waitFor(() =>
+      expect(api.listConversations).toHaveBeenLastCalledWith(
+        0,
+        expect.any(AbortSignal),
+      ),
+    )
+    expect(api.askConversation).not.toHaveBeenCalled()
+  })
+  it('restores rename-trigger focus after cancelling a dialog', async () => {
+    mount()
+    await loaded()
+    const trigger = screen.getByRole('button', { name: 'Rename conversation' })
+    await userEvent.click(trigger)
+    expect(
+      within(screen.getByRole('dialog')).getByLabelText('Conversation title'),
+    ).toHaveFocus()
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Cancel',
+      }),
+    )
+    expect(trigger).toHaveFocus()
+    expect(api.renameConversation).not.toHaveBeenCalled()
+  })
+  it('does not silently broaden an unavailable saved scope', async () => {
+    vi.mocked(api.getConversation).mockResolvedValue({
+      ...first,
+      scope_available: false,
+    })
+    mount()
+    await loaded()
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Original scope unavailable',
+    )
+    expect(screen.getByLabelText('Your question')).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Send question' })).toBeDisabled()
+    expect(api.askConversation).not.toHaveBeenCalled()
+  })
+  it('keeps scope-load errors blocking creation rather than defaulting to all documents', async () => {
+    vi.mocked(api.listSearchDocuments).mockRejectedValue(
+      new Error('Scope unavailable'),
+    )
+    mount('')
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Scope unavailable',
+    )
+    expect(
+      screen.getByRole('button', { name: 'Create conversation' }),
+    ).toBeDisabled()
+    expect(api.createConversation).not.toHaveBeenCalled()
+  })
+  it('retries conversation-list errors and shows a genuine empty history', async () => {
+    vi.mocked(api.listConversations)
+      .mockRejectedValueOnce(new Error('History unavailable'))
+      .mockResolvedValue({ items: [], total: 0, limit: 20, offset: 0 })
+    mount()
+    await loaded()
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Retry conversation list' }),
+    )
+    await screen.findByText(/No conversations yet/)
+    expect(screen.queryByText('History unavailable')).toBeNull()
+  })
+  it('keeps a long fixed scope available on demand without changing retrieval', async () => {
+    const scope = 'Document: ' + 'Synthetic-reference-'.repeat(12) + '.pdf'
+    vi.mocked(api.getConversation).mockResolvedValue({
+      ...first,
+      scope_label: scope,
+    })
+    mount()
+    await loaded()
+    const scopeControl = screen.getByLabelText('Evidence scope: ' + scope)
+    expect(scopeControl.parentElement).not.toHaveAttribute('open')
+    await userEvent.click(scopeControl)
+    expect(screen.getByText('Selected evidence: ' + scope)).toBeVisible()
+    expect(api.askConversation).not.toHaveBeenCalled()
+  })
+  it('can check an uncertain request with the same key while the server is still generating', async () => {
+    vi.mocked(api.askConversation).mockRejectedValueOnce(
+      new Error('Connection interrupted'),
+    )
+    mount()
+    await loaded()
+    await userEvent.type(
+      screen.getByLabelText('Your question'),
+      'Recover this turn',
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Send question' }))
+    await screen.findByText('Connection interrupted')
+    const original = vi.mocked(api.askConversation).mock.calls[0][1]
+    vi.mocked(api.getConversation).mockResolvedValue({
+      ...first,
+      generating: true,
+    })
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Refresh messages' }),
+    )
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Rename conversation' }),
+      ).toBeDisabled(),
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: /Check submission/ }),
+    )
+    await waitFor(() => expect(api.askConversation).toHaveBeenCalledTimes(2))
+    expect(vi.mocked(api.askConversation).mock.calls[1][1]).toEqual(original)
+  })
 })

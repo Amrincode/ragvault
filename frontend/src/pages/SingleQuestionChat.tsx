@@ -3,6 +3,8 @@ import { Link } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { PreviewDialog } from '../features/documents/LibraryDialogs'
 import { ClaimAnswer } from '../features/chat/ClaimAnswer'
+import { ChatComposer } from '../features/chat/ChatComposer'
+import { Icon } from '../components/Icon'
 import {
   askDocuments,
   getDocument,
@@ -115,154 +117,129 @@ export function SingleQuestionChat() {
   }
 
   return (
-    <AppShell page="Document chat">
+    <AppShell page="Document chat" compact>
       <Link to="/chat" className="text-sm text-forest underline">
         Open saved conversations
       </Link>
-      <p className="eyebrow">ASK YOUR INDEXED DOCUMENTS</p>
-      <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-        Document chat
-      </h1>
-      <p className="mt-3 max-w-2xl text-sm leading-6 text-muted">
-        Ask a question and Gemma will select original PDF wording for an
-        extractive answer. Quotes can be incomplete or irrelevant. Review the
-        supporting text and original pages.
-      </p>
-      <p className="mt-3 text-xs leading-5 text-muted">
-        First upload, process and index PDFs in{' '}
-        <Link className="font-semibold text-forest underline" to="/documents">
-          Documents
-        </Link>
-        . Each question stands alone. Chat is not saved and earlier answers are
-        not sent to the model.
-      </p>
-      <form
-        className="mt-7 space-y-5 rounded-2xl border border-line bg-surface p-6"
-        onSubmit={(event) => {
-          event.preventDefault()
-          void ask()
-        }}
-      >
-        <div className="flex flex-wrap gap-4">
-          <label className="min-w-40 flex-1 text-xs font-medium">
-            Collection
-            <select
-              aria-label="Collection filter"
-              className="mt-2 block w-full rounded-lg border border-control-border p-2"
-              value={collection}
-              disabled={busy || loadingFilters}
-              onChange={(event) => {
-                setCollection(event.target.value)
-                setDocument('')
-                setOffset(0)
-                setDocuments(null)
-                clearResult()
-                setLoadingFilters(true)
-              }}
-            >
-              <option value="">All collections</option>
-              {collections.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="min-w-40 flex-1 text-xs font-medium">
-            Document
-            <select
-              aria-label="Document filter"
-              className="mt-2 block w-full rounded-lg border border-control-border p-2"
-              value={document}
-              disabled={busy || loadingFilters}
-              onChange={(event) => {
-                setDocument(event.target.value)
-                clearResult()
-              }}
-            >
-              <option value="">All documents</option>
-              {documents?.items.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.filename}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-xs font-medium">
-            Passages to retrieve
-            <input
-              aria-label="Passages to retrieve"
-              className="mt-2 block w-24 rounded-lg border border-control-border p-2"
-              type="number"
-              min={1}
-              max={20}
-              step={1}
-              value={topK}
-              disabled={busy}
-              onChange={(event) => {
-                setTopK(Number(event.target.value))
-                clearResult()
-              }}
-            />
-          </label>
-        </div>
-        {documents && documents.total > 100 && (
-          <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
-            <button
-              type="button"
-              className="secondary-button"
-              disabled={busy || loadingFilters || offset === 0}
-              onClick={() => {
-                setOffset(Math.max(0, offset - 100))
-                setDocument('')
-                clearResult()
-                setLoadingFilters(true)
-              }}
-            >
-              Previous document options
-            </button>
-            <span>
-              {offset + 1}–{Math.min(offset + 100, documents.total)} of{' '}
-              {documents.total} documents
-            </span>
-            <button
-              type="button"
-              className="secondary-button"
-              disabled={
-                busy || loadingFilters || offset + 100 >= documents.total
-              }
-              onClick={() => {
-                setOffset(offset + 100)
-                setDocument('')
-                clearResult()
-                setLoadingFilters(true)
-              }}
-            >
-              Next document options
-            </button>
+      <div className="mt-4 mb-6">
+        <p className="eyebrow">UNSAVED WORKSPACE</p>
+        <h1 className="mt-1 text-page font-semibold">Ask a single question</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+          A focused answer from your indexed PDFs. Questions stand alone,
+          nothing is saved, and earlier answers are not sent to the model.
+          Review the supporting wording and original pages.
+        </p>
+        <p className="mt-2 text-meta text-muted">
+          Upload, process and index your PDFs in{' '}
+          <Link className="font-medium text-accent underline" to="/documents">
+            Documents
+          </Link>{' '}
+          before asking.
+        </p>
+      </div>
+      <div className="overflow-hidden rounded-card border border-line bg-surface">
+        <div className="space-y-4 p-4 sm:p-6">
+          <h2 className="flex items-center gap-2 text-sm font-semibold">
+            <Icon name="documents" />
+            Choose your evidence
+          </h2>
+          <div className="flex flex-wrap gap-4">
+            <label className="min-w-0 basis-48 flex-1 text-sm font-medium">
+              Collection
+              <select
+                aria-label="Collection filter"
+                className="text-input mt-2 min-w-0"
+                value={collection}
+                disabled={busy || loadingFilters}
+                onChange={(event) => {
+                  setCollection(event.target.value)
+                  setDocument('')
+                  setOffset(0)
+                  setDocuments(null)
+                  clearResult()
+                  setLoadingFilters(true)
+                }}
+              >
+                <option value="">All collections</option>
+                {collections.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="min-w-0 basis-48 flex-1 text-sm font-medium">
+              Document
+              <select
+                aria-label="Document filter"
+                className="text-input mt-2 min-w-0"
+                value={document}
+                disabled={busy || loadingFilters}
+                onChange={(event) => {
+                  setDocument(event.target.value)
+                  clearResult()
+                }}
+              >
+                <option value="">All documents</option>
+                {documents?.items.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.filename}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
-        )}
-        <label htmlFor="chat-question" className="block text-sm font-medium">
-          Your question
-        </label>
-        <textarea
-          id="chat-question"
-          rows={3}
-          maxLength={2000}
-          className="w-full rounded-xl border border-control-border p-3 text-sm"
-          placeholder="What does the document say about backup retention?"
-          value={question}
-          disabled={busy}
-          onChange={(event) => setQuestion(event.target.value)}
+          {documents && documents.total > 100 && (
+            <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
+              <button
+                type="button"
+                className="secondary-button"
+                disabled={busy || loadingFilters || offset === 0}
+                onClick={() => {
+                  setOffset(Math.max(0, offset - 100))
+                  setDocument('')
+                  clearResult()
+                  setLoadingFilters(true)
+                }}
+              >
+                Previous document options
+              </button>
+              <span>
+                {offset + 1}–{Math.min(offset + 100, documents.total)} of{' '}
+                {documents.total} documents
+              </span>
+              <button
+                type="button"
+                className="secondary-button"
+                disabled={
+                  busy || loadingFilters || offset + 100 >= documents.total
+                }
+                onClick={() => {
+                  setOffset(offset + 100)
+                  setDocument('')
+                  clearResult()
+                  setLoadingFilters(true)
+                }}
+              >
+                Next document options
+              </button>
+            </div>
+          )}
+        </div>
+        <ChatComposer
+          single
+          question={question}
+          onQuestion={setQuestion}
+          topK={topK}
+          onTopK={(value) => {
+            setTopK(value)
+            clearResult()
+          }}
+          disabled={busy || loadingFilters || !!filterError}
+          busy={busy}
+          onSend={() => void ask()}
         />
-        <button
-          type="submit"
-          className="primary-button"
-          disabled={busy || loadingFilters || !!filterError || !question.trim()}
-        >
-          {busy ? 'Preparing answer…' : 'Ask documents'}
-        </button>
-      </form>
+      </div>
       {(error || filterError) && (
         <p role="alert" className="error-message mt-5">
           {error || filterError}
@@ -275,8 +252,8 @@ export function SingleQuestionChat() {
         </p>
       )}
       {result && (
-        <section aria-label="Document answer" className="mt-7 space-y-5">
-          <div className="rounded-2xl border border-line bg-surface p-6">
+        <section aria-label="Document answer" className="mt-6 space-y-4">
+          <div className="rounded-card border border-line bg-surface p-4 sm:p-6">
             <p className="eyebrow">
               {result.status === 'answered'
                 ? 'ANSWER FROM RETRIEVED TEXT'
@@ -289,10 +266,13 @@ export function SingleQuestionChat() {
             <h2 className="mt-3 break-words text-base font-semibold">
               {asked}
             </h2>
-            <ClaimAnswer
-              result={result}
-              onOpenSource={(source) => void openSource(source)}
-            />
+            <div className="mt-4">
+              <ClaimAnswer
+                result={result}
+                onOpenSource={(source) => void openSource(source)}
+                compact
+              />
+            </div>
             <p className="mt-5 text-xs leading-5 text-muted">
               {result.chat_model} · Retrieval{' '}
               {result.timings.retrieval_ms.toFixed(0)} ms · Generation{' '}
@@ -310,8 +290,13 @@ export function SingleQuestionChat() {
             </p>
           )}
           {!!result.sources.length && (
-            <div>
-              <h2 className="text-base font-semibold">Retrieved sources</h2>
+            <details
+              open={!result.claims?.length || undefined}
+              className="rounded-card border border-line bg-surface p-4 sm:p-6"
+            >
+              <summary className="cursor-pointer text-sm font-medium">
+                Retrieved sources · context sent to the model
+              </summary>
               <p className="mt-2 text-xs leading-5 text-muted">
                 These excerpts were sent to the model. They do not verify every
                 statement in the answer.
@@ -345,7 +330,7 @@ export function SingleQuestionChat() {
                   </li>
                 ))}
               </ol>
-            </div>
+            </details>
           )}
         </section>
       )}
