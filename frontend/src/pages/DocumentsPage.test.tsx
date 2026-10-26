@@ -18,6 +18,7 @@ vi.mock('../lib/api', () => ({
   deleteDocument: vi.fn(),
   getDocumentPDF: vi.fn(),
   processDocument: vi.fn(),
+  indexDocument: vi.fn(),
   listDocumentChunks: vi.fn(),
   documentDownloadUrl: (id: string) =>
     `/api/documents/${id}/file?download=true`,
@@ -75,6 +76,238 @@ beforeEach(() => {
 })
 
 describe('document library', () => {
+  it('distinguishes processed text from a completed index without automatic mutations', async () => {
+    vi.mocked(api.listDocuments).mockResolvedValue({
+      items: [
+        {
+          ...document,
+          processing_status: 'processed',
+          indexing_status: 'not_indexed',
+          chunk_count: 3,
+          page_count: 2,
+        },
+      ],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    })
+    mount()
+    expect(await screen.findByText('Processed')).toBeInTheDocument()
+    expect(screen.getByText('Not indexed')).toBeInTheDocument()
+    expect(screen.queryByText('Indexed')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Index for search paper.pdf' }),
+    ).toBeEnabled()
+    expect(api.processDocument).not.toHaveBeenCalled()
+    expect(api.indexDocument).not.toHaveBeenCalled()
+  })
+  it('supports responsive collection selection and hides the previous collection while loading', async () => {
+    const empty = {
+      ...collection,
+      id: 'empty',
+      name: 'Empty collection',
+      document_count: 0,
+    }
+    vi.mocked(api.listCollections).mockResolvedValue([collection, empty])
+    let finish!: (value: Awaited<ReturnType<typeof api.listDocuments>>) => void
+    vi.mocked(api.listDocuments).mockImplementation((id) =>
+      id === empty.id
+        ? new Promise((resolve) => {
+            finish = resolve
+          })
+        : Promise.resolve({
+            items: [document],
+            total: 1,
+            limit: 20,
+            offset: 0,
+          }),
+    )
+    mount()
+    await screen.findByText(document.filename)
+    await userEvent.selectOptions(
+      screen.getByRole('combobox', { name: 'Collection filter' }),
+      empty.id,
+    )
+    expect(screen.queryByText(document.filename)).not.toBeInTheDocument()
+    expect(screen.getByText('Loading your library…')).toBeInTheDocument()
+    await waitFor(() =>
+      expect(api.listDocuments).toHaveBeenLastCalledWith(
+        empty.id,
+        0,
+        expect.any(AbortSignal),
+      ),
+    )
+    finish({ items: [], total: 0, limit: 20, offset: 0 })
+    expect(
+      await screen.findByText('No PDFs in this collection yet'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', {
+        name: 'Delete collection Empty collection',
+      }),
+    ).toBeEnabled()
+  })
+  it('never presents an unavailable initial library as an empty library', async () => {
+    vi.mocked(api.listDocuments).mockRejectedValue(
+      new Error('Database unavailable'),
+    )
+    mount()
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Database unavailable',
+    )
+    expect(screen.getByText('Count unavailable')).toBeInTheDocument()
+    expect(
+      screen.queryByText('Room for your first PDF'),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Create your first collection' }),
+    ).not.toBeInTheDocument()
+    vi.mocked(api.listDocuments).mockResolvedValue({
+      items: [document],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    })
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(await screen.findByText(document.filename)).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+  it('preserves last-loaded data on refresh failure with an explicit warning', async () => {
+    mount()
+    await screen.findByText(document.filename)
+    vi.mocked(api.listDocuments).mockRejectedValue(
+      new Error('Temporarily unavailable'),
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Refresh library' }),
+    )
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Showing the last loaded data',
+    )
+    expect(screen.getByText(document.filename)).toBeInTheDocument()
+  })
+  it('uses server pagination and resets to the first page on a collection change', async () => {
+    vi.mocked(api.listDocuments).mockImplementation((_id, offset) =>
+      Promise.resolve({
+        items:
+          offset === 0
+            ? Array.from({ length: 20 }, (_, i) => ({
+                ...document,
+                id: `doc-${i}`,
+                filename: `Paper ${i + 1}.pdf`,
+              }))
+            : [{ ...document, id: 'last', filename: 'Last paper.pdf' }],
+        total: 21,
+        limit: 20,
+        offset,
+      }),
+    )
+    mount()
+    await screen.findByText('1–20 of 21')
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(await screen.findByText('21–21 of 21')).toBeInTheDocument()
+    expect(screen.getByText('Last paper.pdf')).toBeInTheDocument()
+    expect(api.listDocuments).toHaveBeenLastCalledWith(
+      null,
+      20,
+      expect.any(AbortSignal),
+    )
+    await userEvent.selectOptions(
+      screen.getByRole('combobox', { name: 'Collection filter' }),
+      collection.id,
+    )
+    await waitFor(() =>
+      expect(api.listDocuments).toHaveBeenLastCalledWith(
+        collection.id,
+        0,
+        expect.any(AbortSignal),
+      ),
+    )
+    expect(await screen.findByText('1–20 of 21')).toBeInTheDocument()
+  })
+  it('confirms empty-collection deletion and preserves backend rejection feedback', async () => {
+    vi.mocked(api.listCollections).mockResolvedValue([
+      { ...collection, document_count: 0 },
+    ])
+    vi.mocked(api.listDocuments).mockResolvedValue({
+      items: [],
+      total: 0,
+      limit: 20,
+      offset: 0,
+    })
+    mount()
+    await screen.findByText('Room for your first PDF')
+    await userEvent.selectOptions(
+      screen.getByRole('combobox', { name: 'Collection filter' }),
+      collection.id,
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Delete collection Research' }),
+    )
+    expect(api.deleteCollection).not.toHaveBeenCalled()
+    vi.mocked(api.deleteCollection).mockRejectedValue(
+      new Error('Collection now contains documents'),
+    )
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Delete',
+      }),
+    )
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'now contains documents',
+    )
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+  it('renames a selected collection and shows upload success without claiming indexing', async () => {
+    mount()
+    await screen.findByText(document.filename)
+    await userEvent.selectOptions(
+      screen.getByRole('combobox', { name: 'Collection filter' }),
+      collection.id,
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Rename collection Research' }),
+    )
+    await userEvent.clear(screen.getByLabelText('Collection name'))
+    await userEvent.type(
+      screen.getByLabelText('Collection name'),
+      'Updated research',
+    )
+    vi.mocked(api.renameCollection).mockResolvedValue({
+      ...collection,
+      name: 'Updated research',
+    })
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() =>
+      expect(api.renameCollection).toHaveBeenCalledWith(
+        collection.id,
+        'Updated research',
+      ),
+    )
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Upload PDF' }))
+    await userEvent.upload(
+      screen.getByLabelText('Choose PDF'),
+      new File(['%PDF-test'], 'new.pdf', { type: 'application/pdf' }),
+    )
+    vi.mocked(api.uploadDocument).mockResolvedValue({
+      ...document,
+      filename: 'new.pdf',
+    })
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Upload PDF',
+      }),
+    )
+    expect(
+      await screen.findByText(
+        'Uploaded “new.pdf”. Process text, then index for search when ready.',
+      ),
+    ).toBeInTheDocument()
+  })
   it('processes an uploaded document and refreshes its status', async () => {
     const user = userEvent.setup()
     mount()
@@ -165,6 +398,9 @@ describe('document library', () => {
     const user = userEvent.setup()
     mount()
     await user.click(
+      await screen.findByLabelText('Document details for paper.pdf'),
+    )
+    await user.click(
       await screen.findByRole('button', { name: 'Delete paper.pdf' }),
     )
     expect(api.deleteDocument).not.toHaveBeenCalled()
@@ -177,6 +413,10 @@ describe('document library', () => {
     await waitFor(() =>
       expect(api.deleteDocument).toHaveBeenCalledWith(document.id),
     )
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    )
+    expect(screen.getByRole('heading', { name: 'All documents' })).toHaveFocus()
   })
 
   it('opens a PDF preview and download link', async () => {
@@ -197,6 +437,9 @@ describe('document library', () => {
     const user = userEvent.setup()
     mount()
     await user.click(
+      await screen.findByLabelText('Document details for paper.pdf'),
+    )
+    await user.click(
       await screen.findByRole('button', { name: 'Rename paper.pdf' }),
     )
     await user.clear(screen.getByLabelText('PDF filename'))
@@ -214,24 +457,18 @@ describe('document library', () => {
     )
   })
 
-  it('preserves a nonempty collection when deletion is rejected', async () => {
-    const user = userEvent.setup()
+  it('prevents deleting a nonempty collection and explains the restriction', async () => {
     mount()
-    await user.click(await screen.findByRole('button', { name: /^Research/ }))
-    await user.click(
+    await userEvent.click(
+      await screen.findByRole('button', { name: /^Research/ }),
+    )
+    expect(
       screen.getByRole('button', { name: 'Delete collection Research' }),
-    )
-    vi.mocked(api.deleteCollection).mockRejectedValue(
-      new Error("Delete the collection's documents first"),
-    )
-    await user.click(
-      within(screen.getByRole('dialog')).getByRole('button', {
-        name: /^Delete$/,
-      }),
-    )
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'documents first',
-    )
+    ).toBeDisabled()
+    expect(
+      screen.getByText('Only empty collections can be deleted.'),
+    ).toBeInTheDocument()
+    expect(api.deleteCollection).not.toHaveBeenCalled()
   })
 
   it('shows an actionable empty state and network errors', async () => {

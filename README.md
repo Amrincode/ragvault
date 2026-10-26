@@ -4,13 +4,15 @@ A local-first document intelligence portfolio project, built in explicit milesto
 
 See [conversation architecture](docs/architecture/conversations.md) and [Milestone 7 verification](docs/verification-milestone-7.md) for the current lifecycle, context policy, measurements and limitations. [Source citations](docs/architecture/source-citations.md), [Milestone 6 verification](docs/verification-milestone-6.md) and its [reliability investigation](docs/citation-reliability-investigation.md) document the grounding baseline.
 
-**Current UI stage: 8.2 — Navigation and Dashboard.** The shared design system and Light/Dark/System themes now support a responsive navy sidebar, accessible mobile navigation drawer, and dashboard with real workspace totals, recent uploads, quick actions and checked service status. Documents, Search, Chat and the PDF viewer retain their existing page contents. See the [design-system guide](docs/design-system.md), [Stage 8.1 verification](docs/verification-milestone-8-1.md) and [Stage 8.2 verification](docs/verification-milestone-8-2.md). In development, inspect components at `/dev/design-system`; the preview is excluded from production builds.
+**Current UI stage: 8.3 — Professional Document Library.** The shared design system, Light/Dark/System themes, responsive navigation and dashboard now extend to the document library. Preview/download actions, separate processing/indexing states, expandable technical details, responsive collection selection and upload feedback are available. Search, Chat and the PDF reader retain their existing page contents. See the [design-system guide](docs/design-system.md), [Stage 8.2 verification](docs/verification-milestone-8-2.md) and [Stage 8.3 verification](docs/verification-milestone-8-3.md). In development, inspect shared components at `/dev/design-system`; the preview is excluded from production builds.
 
 **Application features from Milestones 1–7:** Save scoped document discussions, revisit ordered messages after reload/restart, and use bounded prior user-question topics for fresh-evidence follow-ups. Extractive claims retain numbered source references, checked quotations and original PDF page controls. PDF management, processing, semantic search and stateless chat remain available.
 
 **Single user. Local machine only. No authentication. Do not expose this service publicly.** Saved messages and cited excerpts are private local database data, not encrypted conversation storage. Source checks do not prove truth, relevance or completeness. Multi-user access, semantic entailment verification, streaming, OCR and background queues are not implemented.
 
-![Document library](docs/screenshots/document-library.png)
+![Document library](docs/screenshots/library-light.jpg)
+
+Sanitized visual fixture; the real library displays local API data. Historical milestone screenshots remain in their original reports.
 
 ![Page-aware text inspector](docs/screenshots/text-chunks.png)
 

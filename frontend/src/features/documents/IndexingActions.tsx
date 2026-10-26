@@ -1,13 +1,43 @@
 import { useState } from 'react'
 import { indexDocument } from '../../lib/api'
 import type { Document } from '../../types/library'
+import { Badge } from '../../components/ui/Badge'
+import { Button } from '../../components/ui/Button'
+
+export function IndexingStatus({ document }: { document: Document }) {
+  const state = document.indexing_status ?? 'not_indexed'
+  return (
+    <Badge
+      tone={
+        state === 'indexed'
+          ? 'success'
+          : state === 'failed'
+            ? 'danger'
+            : state === 'indexing'
+              ? 'accent'
+              : 'neutral'
+      }
+    >
+      {
+        {
+          indexed: 'Indexed',
+          failed: 'Indexing failed',
+          indexing: 'Indexing',
+          not_indexed: 'Not indexed',
+        }[state]
+      }
+    </Badge>
+  )
+}
 
 export function IndexingActions({
   document,
   onChanged,
+  compact = false,
 }: {
   document: Document
   onChanged: () => void
+  compact?: boolean
 }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -38,31 +68,24 @@ export function IndexingActions({
     }
   }
   return (
-    <div className="mt-3 space-y-2 text-xs">
+    <div className="space-y-2 text-sm">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="rounded bg-sky-50 px-2 py-1 text-sky-800">
-          {state === 'indexed'
-            ? 'Indexed'
-            : state === 'indexing'
-              ? 'Indexing'
-              : state === 'failed'
-                ? 'Indexing failed'
-                : 'Not indexed'}
-        </span>
-        <button
-          className="secondary-button"
+        {!compact && <IndexingStatus document={document} />}
+        <Button
+          variant="secondary"
+          size="sm"
           type="button"
           aria-label={`${action} ${document.filename}`}
           disabled={busy}
           onClick={() => void index()}
         >
           {busy ? 'Indexing…' : action}
-        </button>
+        </Button>
         {(busy || state === 'indexing') && (
           <span role="status">Embedding existing chunks locally…</span>
         )}
       </div>
-      {state === 'indexed' && (
+      {!compact && state === 'indexed' && (
         <p className="text-muted">
           {document.indexed_chunk_count} indexed chunks ·{' '}
           {document.embedding_model} · {document.embedding_dimensions}{' '}

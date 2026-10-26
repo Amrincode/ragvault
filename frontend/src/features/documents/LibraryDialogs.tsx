@@ -8,6 +8,10 @@ import {
 } from 'react'
 import { Dialog } from '../../components/Dialog'
 import { Icon } from '../../components/Icon'
+import { Button } from '../../components/ui/Button'
+import { Input } from '../../components/ui/Input'
+import { FormField } from '../../components/ui/FormField'
+import { LoadingIndicator } from '../../components/ui/LoadingIndicator'
 import {
   documentDownloadUrl,
   getDocumentPDF,
@@ -63,29 +67,26 @@ export function NameDialog({
           void submit(event)
         }}
       >
-        <label htmlFor={id} className="text-sm font-medium">
-          {label}
-        </label>
-        <input
-          autoFocus
-          id={id}
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          required
-          maxLength={filename ? 255 : 120}
-          className="text-input mt-2"
-          disabled={busy}
-        />
-        {filename && (
-          <p className="mt-2 text-xs text-muted">
-            Keep the .pdf extension. The original file contents stay unchanged.
-          </p>
-        )}
-        {error && (
-          <p role="alert" className="error-message">
-            {error}
-          </p>
-        )}
+        <FormField
+          label={label}
+          error={error ?? undefined}
+          hint={
+            filename
+              ? 'Keep the .pdf extension. Original file contents stay unchanged.'
+              : undefined
+          }
+        >
+          <Input
+            autoFocus
+            id={id}
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            required
+            maxLength={filename ? 255 : 120}
+            className="text-input mt-2"
+            disabled={busy}
+          />
+        </FormField>
         <div className="mt-6 flex justify-end gap-2">
           <button
             type="button"
@@ -95,9 +96,9 @@ export function NameDialog({
           >
             Cancel
           </button>
-          <button className="primary-button" disabled={busy || !value.trim()}>
+          <Button type="submit" loading={busy} disabled={!value.trim()}>
             {busy ? 'Saving…' : 'Save'}
-          </button>
+          </Button>
         </div>
       </form>
     </Dialog>
@@ -171,7 +172,7 @@ export function UploadDialog({
   collections: Collection[]
   selectedId: string | null
   config: LibraryConfig
-  onUploaded: () => void
+  onUploaded: (document: Document) => void
   onClose: () => void
 }) {
   const [collectionId, setCollectionId] = useState(
@@ -181,7 +182,6 @@ export function UploadDialog({
   const [busy, setBusy] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const id = useId()
   function choose(files: FileList | null) {
     setError(null)
     setFile(null)
@@ -202,12 +202,12 @@ export function UploadDialog({
   }
   async function submit(event: FormEvent) {
     event.preventDefault()
-    if (!file || !collectionId) return
+    if (!file || !collectionId || busy) return
     setBusy(true)
     setError(null)
     try {
-      await uploadDocument(collectionId, file)
-      onUploaded()
+      const uploaded = await uploadDocument(collectionId, file)
+      onUploaded(uploaded)
       onClose()
     } catch (cause) {
       setError(errorMessage(cause))
@@ -217,28 +217,35 @@ export function UploadDialog({
   }
   return (
     <Dialog title="Upload a PDF" busy={busy} onClose={onClose}>
+      <p className="mb-5 text-sm leading-6 text-muted">
+        Add one original PDF to your local library. You can process and index it
+        separately after uploading.
+      </p>
       <form
+        aria-busy={busy}
         onSubmit={(event) => {
           void submit(event)
         }}
+        className="space-y-5"
       >
-        <label htmlFor={`${id}-collection`} className="text-sm font-medium">
-          Collection
-        </label>
-        <select
-          id={`${id}-collection`}
-          className="text-input mt-2"
-          value={collectionId}
-          onChange={(event) => setCollectionId(event.target.value)}
-          disabled={busy}
-          required
+        <FormField
+          label="Collection"
+          hint="The PDF will be stored in this collection."
         >
-          {collections.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
-        </select>
+          <select
+            className="text-input"
+            value={collectionId}
+            onChange={(event) => setCollectionId(event.target.value)}
+            disabled={busy}
+            required
+          >
+            {collections.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </FormField>
         <div
           onDragOver={(event) => {
             event.preventDefault()
@@ -250,65 +257,57 @@ export function UploadDialog({
             setDragging(false)
             if (!busy) choose(event.dataTransfer.files)
           }}
-          className={`mt-5 rounded-xl border-2 border-dashed p-6 text-center ${dragging ? 'border-forest bg-success-soft' : 'border-line bg-canvas'}`}
+          className={`min-w-0 rounded-card border border-dashed p-4 ${dragging ? 'border-primary bg-accent-soft' : 'border-control-border bg-canvas'}`}
         >
-          <Icon name="upload" className="mx-auto mb-3 size-7 text-forest" />
-          <label htmlFor={`${id}-file`} className="block text-sm font-medium">
-            Drop a PDF here or choose a file
-          </label>
-          <input
-            id={`${id}-file`}
-            aria-label="Choose PDF"
-            type="file"
-            accept=".pdf,application/pdf"
-            disabled={busy}
-            onChange={(event) => choose(event.target.files)}
-            className="mt-4 w-full text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-surface file:px-3 file:py-2 file:font-medium file:text-forest"
-          />
-          <p className="mt-3 text-xs text-muted">
-            Up to {formatBytes(config.max_upload_bytes)} ·{' '}
-            {config.max_pdf_pages.toLocaleString()} pages · Unencrypted PDFs
-          </p>
+          <Icon name="upload" className="mb-3 size-7 text-accent" />
+          <FormField
+            label="Choose PDF"
+            hint={`One unencrypted PDF · Up to ${formatBytes(config.max_upload_bytes)} · ${config.max_pdf_pages.toLocaleString()} pages. Drop a file here or use the file chooser.`}
+            error={error ?? undefined}
+          >
+            <input
+              type="file"
+              accept=".pdf,application/pdf"
+              disabled={busy}
+              onChange={(event) => choose(event.target.files)}
+              className="block w-full min-w-0 rounded-control text-meta file:mr-3 file:min-h-10 file:rounded-control file:border file:border-control-border file:bg-surface file:px-3 file:py-2 file:font-medium file:text-ink"
+            />
+          </FormField>
         </div>
         {file && (
-          <p className="mt-3 break-words text-sm">
-            {file.name}{' '}
-            <span className="text-muted">({formatBytes(file.size)})</span>
-          </p>
-        )}
-        {error && (
-          <p role="alert" className="error-message">
-            {error}
-          </p>
+          <div
+            className="min-w-0 rounded-control border border-line bg-accent-soft p-4"
+            role="status"
+          >
+            <p className="text-meta font-medium text-accent">Selected PDF</p>
+            <p className="mt-1 break-words text-sm font-semibold [overflow-wrap:anywhere]">
+              {file.name}
+            </p>
+            <p className="mt-1 text-meta text-muted">
+              {formatBytes(file.size)} · Destination:{' '}
+              {collections.find((item) => item.id === collectionId)?.name}
+            </p>
+          </div>
         )}
         {busy && (
-          <p
-            role="status"
-            className="mt-4 flex items-center gap-2 text-sm text-forest"
-          >
-            <Icon name="refresh" className="size-4 animate-spin" />
-            Uploading and validating your PDF…
-          </p>
+          <LoadingIndicator label="Uploading and validating your PDF…" />
         )}
-        <p className="mt-4 text-xs leading-5 text-muted">
-          PDFs are stored on your machine. Duplicate content in the same
-          collection is rejected. No text extraction or AI processing runs.
+        <p className="text-meta leading-6 text-muted">
+          Files remain on this machine. Duplicate content in the same collection
+          is rejected. The server validates the original PDF; no text extraction
+          or AI runs during upload.
         </p>
-        <div className="mt-6 flex justify-end gap-2">
-          <button
-            type="button"
-            className="secondary-button"
-            disabled={busy}
-            onClick={onClose}
-          >
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="secondary" disabled={busy} onClick={onClose}>
             Cancel
-          </button>
-          <button
-            className="primary-button"
-            disabled={busy || !file || !collectionId}
+          </Button>
+          <Button
+            type="submit"
+            loading={busy}
+            disabled={!file || !collectionId}
           >
             {busy ? 'Uploading…' : 'Upload PDF'}
-          </button>
+          </Button>
         </div>
       </form>
     </Dialog>

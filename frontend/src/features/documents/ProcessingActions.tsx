@@ -2,31 +2,45 @@ import { useEffect, useState } from 'react'
 import { Dialog } from '../../components/Dialog'
 import { listDocumentChunks, processDocument } from '../../lib/api'
 import type { ChunkPage, Document } from '../../types/library'
+import { Badge } from '../../components/ui/Badge'
+import { Button } from '../../components/ui/Button'
 
 const labels = {
   uploaded: 'Uploaded',
   processing: 'Processing',
   processed: 'Processed',
-  failed: 'Failed',
+  failed: 'Processing failed',
   no_text: 'No extractable text',
 }
 
 export function ProcessingStatus({ document }: { document: Document }) {
   return (
-    <span
-      className={`rounded px-2 py-0.5 ${document.processing_status === 'failed' ? 'bg-danger-soft text-danger' : 'bg-success-soft text-success'}`}
+    <Badge
+      tone={
+        document.processing_status === 'failed'
+          ? 'danger'
+          : document.processing_status === 'processed'
+            ? 'success'
+            : document.processing_status === 'processing'
+              ? 'accent'
+              : document.processing_status === 'no_text'
+                ? 'warning'
+                : 'neutral'
+      }
     >
       {labels[document.processing_status]}
-    </span>
+    </Badge>
   )
 }
 
 export function ProcessingActions({
   document,
   onChanged,
+  compact = false,
 }: {
   document: Document
   onChanged: () => void
+  compact?: boolean
 }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -56,26 +70,28 @@ export function ProcessingActions({
     }
   }
   return (
-    <div className="mt-3 space-y-2 text-xs">
+    <div className="space-y-2 text-sm">
       <div className="flex flex-wrap items-center gap-3">
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
           type="button"
-          className="secondary-button"
           disabled={busy}
           onClick={() => void process()}
           aria-label={`${action} ${document.filename}`}
         >
           {busy ? 'Processing…' : action}
-        </button>
+        </Button>
         {(document.processing_status === 'processed' ||
           document.processing_status === 'no_text') && (
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             type="button"
-            className="text-forest underline"
             onClick={() => setInspect(true)}
           >
             Inspect text
-          </button>
+          </Button>
         )}
         {busy || document.processing_status === 'processing' ? (
           <span role="status">
@@ -83,7 +99,7 @@ export function ProcessingActions({
           </span>
         ) : null}
       </div>
-      {document.processing_status === 'processed' && (
+      {!compact && document.processing_status === 'processed' && (
         <p className="text-muted">
           {document.chunk_count} chunks · {document.page_count} pages
         </p>
