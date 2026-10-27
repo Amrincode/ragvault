@@ -318,6 +318,7 @@ export function SearchPage() {
           <EmptyState
             icon={<Icon name="search" className="size-7" />}
             title="Find the passage behind an idea"
+            headingLevel={2}
             description="Ask a focused question, narrow the document scope if needed, then open an original page to read its context."
           />
         </div>
@@ -372,7 +373,7 @@ export function SearchPage() {
                   <div className="flex min-w-0 items-start gap-3">
                     <span
                       className="grid size-9 shrink-0 place-items-center rounded-control bg-accent-soft text-sm font-semibold text-accent"
-                      aria-label={`Result ${index + 1}`}
+                      aria-hidden="true"
                     >
                       {index + 1}
                     </span>
@@ -398,7 +399,7 @@ export function SearchPage() {
                       variant="secondary"
                       aria-busy={opening === hit.chunk_id || undefined}
                       onClick={() => void openOriginal(hit)}
-                      aria-label={`Open ${hit.filename} at page ${hit.page_number}`}
+                      aria-label={`Open original · Page ${hit.page_number}: ${hit.filename}`}
                     >
                       <Icon name="arrow" className="size-4" />
                       {opening === hit.chunk_id

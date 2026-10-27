@@ -5,12 +5,15 @@ export function EmptyState({
   description,
   icon,
   action,
+  headingLevel = 3,
 }: {
   title: string
   description: string
   icon?: ReactNode
   action?: ReactNode
+  headingLevel?: 2 | 3
 }) {
+  const Heading = headingLevel === 2 ? 'h2' : 'h3'
   return (
     <div className="flex flex-col items-center gap-3 px-5 py-10 text-center">
       {icon && (
@@ -21,7 +24,7 @@ export function EmptyState({
           {icon}
         </span>
       )}
-      <h3 className="text-base font-semibold">{title}</h3>
+      <Heading className="text-base font-semibold">{title}</Heading>
       <p className="max-w-sm text-sm text-muted">{description}</p>
       {action && <div className="mt-1">{action}</div>}
     </div>

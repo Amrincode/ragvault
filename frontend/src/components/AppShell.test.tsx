@@ -81,6 +81,7 @@ describe('shared workspace navigation', () => {
       </MemoryRouter>,
     )
     expect(screen.getByRole('main')).not.toHaveFocus()
+    expect(document.title).toBe('Dashboard · RAGVault')
     await userEvent.click(
       screen.getByRole('button', { name: 'Open navigation' }),
     )
@@ -93,6 +94,7 @@ describe('shared workspace navigation', () => {
       await screen.findByRole('heading', { name: 'Existing library' }),
     ).toBeInTheDocument()
     await waitFor(() => expect(screen.getByRole('main')).toHaveFocus())
+    expect(document.title).toBe('Documents · RAGVault')
     expect(document.body.style.overflow).toBe('')
   })
   it.each([

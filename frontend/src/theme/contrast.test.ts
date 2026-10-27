@@ -35,6 +35,8 @@ const textPairs = [
   ['muted', 'surface'],
   ['muted', 'elevated'],
   ['muted', 'field'],
+  ['muted', 'accent-soft'],
+  ['ink', 'accent-soft'],
   ['accent', 'canvas'],
   ['accent', 'surface'],
   ['accent', 'accent-soft'],

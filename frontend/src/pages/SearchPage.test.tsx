@@ -165,7 +165,9 @@ describe('semantic search', () => {
       screen.getByRole('button', { name: 'Search passages' }),
     )
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Open finance.pdf at page 2' }),
+      await screen.findByRole('button', {
+        name: 'Open original · Page 2: finance.pdf',
+      }),
     )
     expect(await screen.findByRole('dialog')).toHaveTextContent(
       'Original PDF at page 2',
@@ -339,7 +341,9 @@ describe('semantic search', () => {
       screen.getByRole('button', { name: 'Search passages' }),
     )
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Open finance.pdf at page 2' }),
+      await screen.findByRole('button', {
+        name: 'Open original · Page 2: finance.pdf',
+      }),
     )
     const signal = vi.mocked(api.getDocument).mock.calls[0][1]!
     await userEvent.selectOptions(
@@ -361,7 +365,7 @@ describe('semantic search', () => {
       screen.getByRole('button', { name: 'Search passages' }),
     )
     const button = await screen.findByRole('button', {
-      name: 'Open finance.pdf at page 2',
+      name: 'Open original · Page 2: finance.pdf',
     })
     await userEvent.click(button)
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -399,7 +403,9 @@ describe('semantic search', () => {
       await screen.findByRole('heading', { name: filename }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('button', { name: 'Open ' + filename + ' at page 2' }),
+      screen.getByRole('button', {
+        name: 'Open original · Page 2: ' + filename,
+      }),
     ).toBeInTheDocument()
     expect(view.container.querySelector('script')).toBeNull()
   })

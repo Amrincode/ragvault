@@ -322,7 +322,7 @@ export function SingleQuestionChat() {
                     <button
                       type="button"
                       className="secondary-button mt-4"
-                      aria-label={`Open ${source.filename} at page ${source.page_number}`}
+                      aria-label={`Open original · Page ${source.page_number}: ${source.filename}`}
                       onClick={() => void openSource(source)}
                     >
                       Open original · Page {source.page_number}

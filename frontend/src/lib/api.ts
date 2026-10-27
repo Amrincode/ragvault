@@ -66,6 +66,12 @@ async function libraryRequest(
         : { 'Content-Type': 'application/json' }),
       ...options.headers,
     },
+  }).catch((cause: unknown) => {
+    if (cause instanceof TypeError && !options.signal?.aborted)
+      throw new Error(
+        'The local API could not be reached. Start FastAPI and retry.',
+      )
+    throw cause
   })
   if (!response.ok) {
     let message = `Request failed (HTTP ${response.status})`

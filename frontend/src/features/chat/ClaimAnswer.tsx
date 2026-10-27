@@ -136,7 +136,7 @@ export function ClaimAnswer({
                     disabled={!allowSources}
                     className="secondary-button text-xs"
                     onClick={() => onOpenSource(citation)}
-                    aria-label={`Open source ${[...numbers].join(', ')}: ${citation.filename}, page ${citation.page_number}`}
+                    aria-label={`Open original · Page ${citation.page_number}: source ${[...numbers].join(', ')}, ${citation.filename}`}
                   >
                     Open original · Page {citation.page_number}
                   </button>

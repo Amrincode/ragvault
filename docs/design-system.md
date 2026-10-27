@@ -1,13 +1,11 @@
 # RAGVault design system
 
-Stage 8.1 establishes shared styling, controls and themes. Stage 8.2 adds the shared
-navigation and dashboard redesign. Stage 8.3 extends it to the document library and
-upload/management controls. Stage 8.4 extends the shared styles to saved and unsaved chat,
-conversation history and compact citation presentation. Search and PDF reader contents retain their existing
-structure and behavior. See [Stage 8.1 verification](verification-milestone-8-1.md),
-[Stage 8.2 verification](verification-milestone-8-2.md) and
-[Stage 8.3 verification and inventory](verification-milestone-8-3.md) and
-[Stage 8.4 verification and inventory](verification-milestone-8-4.md).
+The Modern Professional interface now covers all six Milestone 8 stages: shared tokens
+and themes (8.1), navigation/dashboard (8.2), document library (8.3), conversations/chat
+(8.4), semantic search/PDF reader (8.5), and final accessibility/consistency QA (8.6).
+Stage 8.6 completes the verified Milestone 8 UI foundation. See the
+[Milestone 8 summary](milestone-8-summary.md) and [final QA report](verification-milestone-8-6.md)
+for evidence, inventory and remaining limitations.
 
 ## Direction
 
@@ -29,7 +27,7 @@ utilities. Components use roles, not repeated palette literals.
 | `elevated` — raised cards/dialogs | `#FFFFFF` | `#1C3440` |
 | `field` — input background | `#FFFFFF` | `#11252E` |
 | `ink` — primary text | `#142D36` | `#E8F1F0` |
-| `muted` — secondary text | `#64757B` | `#ABC0C4` |
+| `muted` — secondary text | `#63747A` | `#ABC0C4` |
 | `line` — decorative separators | `#DFE7E5` | `#304951` |
 | `control-border` — identifying input/button boundary | `#7D918F` | `#637F87` |
 | `primary` / `on-primary` — filled action | `#147D75` / white | `#71D5C6` / `#102A30` |
@@ -79,7 +77,7 @@ between controls, 20–24 px card padding/gaps and 28–40 px between page secti
 Badges are pill-shaped. Small/medium/large shared buttons have minimum heights of
 36/40/44 px. Standard fields have a 40 px minimum height and textareas remain resizable.
 Do not override native file, PDF, pagination or specialized conversation controls just
-to use a generic wrapper. Legacy page typography is migrated in later page stages.
+to use a generic wrapper. Page-specific controls retain their existing contracts.
 
 ## Shared React components
 
@@ -95,7 +93,7 @@ and React 19 refs. There is no form/state framework or broad component configura
 | `Badge` | `tone`: neutral/accent/success/warning/danger; visible text communicates meaning |
 | `StatusIndicator` | Tone, optional `loading`, visible text and a decorative dot/spinner; live announcements are opt-in native props |
 | `LoadingIndicator` | Visible `label`, polite status semantics and decorative spinner |
-| `EmptyState` | Required title/description, optional icon and a working action node |
+| `EmptyState` | Required title/description, optional icon/action and headingLevel 2 or 3 (default 3), chosen for its surrounding hierarchy |
 | `FormField` | One native-compatible control child; label, optional hint/error; preserves supplied IDs/descriptions and associates generated IDs/validation state |
 
 ```tsx
@@ -135,7 +133,7 @@ before assertions. They require normal-text pairs to reach 4.5:1, following
 and identifying controls/focus/selected indicators to reach 3:1, following
 [non-text contrast guidance](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html).
 
-The tested text minimum is 4.542:1 in Light and 5.005:1 in Dark. Tested non-text minima
+The tested text minimum is 4.545:1 in Light and 5.005:1 in Dark. Tested non-text minima
 are 3.143:1 and 3.524:1 respectively. Status text, disabled labels, hover actions,
 navigation text and field/focus boundaries are included. Active navigation also has
 an inset accent marker in addition to color and `aria-current`.
@@ -146,8 +144,8 @@ Status information never relies on color alone. Native keyboard behavior is pres
 Reduced-motion CSS removes smooth scrolling and limits animation/transition duration and
 animation iteration; no new page motion is added beyond a loading spinner and color changes.
 
-These checks do not certify the entire application as WCAG conformant. Some legacy pages
-still have dense layout, small metadata and specialized control spacing. Full assistive
+These checks do not certify the entire application as WCAG conformant. Some specialized controls
+remain compact and short viewports require vertical scrolling. Full assistive
 technology, forced-colors, every zoom level and real-device testing remain future work.
 PDF paper/content is intentionally not recolored or treated as application theme content.
 
@@ -213,3 +211,25 @@ viewport; reserve scrollbar space to prevent resize/render feedback loops. Searc
 citation actions retain exact document IDs/pages; stale or unavailable historical sources
 remain disabled. Highlighting, text layers, OCR and annotations are deferred. See the
 [Stage 8.5 verification](verification-milestone-8-5.md) for measurements and accessibility limits.
+
+
+## Stage 8.6: final accessibility and consistency review
+
+The Light muted text token is now `#63747A`: muted metadata on the pale accent surface
+measures 4.54:1 rather than 4.48:1. Contrast tests explicitly include muted/body text on
+that surface in both themes. Decorative result ranks rely on the ordered list's semantics.
+Search's introductory empty state uses h2 beneath h1; nested result empty states keep h3.
+
+Original-page actions keep their visible “Open original · Page N” phrase at the start of
+the accessible name, followed by filename/source details. This supports label matching
+for voice input without changing IDs, page numbers or citation checks. Message times use
+native time/dateTime semantics, a short aria-hidden visible time, full screen-reader text
+and a full-date title instead of an unsupported aria-label on time. The shared shell
+sets a descriptive page title as routes change. Rejected naming forms focus their invalid,
+described input for correction. Network failures explain how to restart the local API;
+abort and server-validation errors retain their original behavior.
+
+Axe-core is a development/test dependency only. Automated component and real-browser
+checks complement the existing contrast and keyboard tests; they do not prove full WCAG
+conformance, factual accuracy, real mobile keyboard behavior or screen-reader usability.
+No audit panel, synthetic API, temporary script or new framework ships with the product.

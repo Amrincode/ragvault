@@ -3,6 +3,7 @@ import {
   Suspense,
   useEffect,
   useId,
+  useRef,
   useState,
   type FormEvent,
 } from 'react'
@@ -47,6 +48,10 @@ export function NameDialog({
   const [value, setValue] = useState(initialValue)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const nameInput = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (error && !busy) nameInput.current?.focus()
+  }, [error, busy])
   async function submit(event: FormEvent) {
     event.preventDefault()
     setBusy(true)
@@ -78,6 +83,7 @@ export function NameDialog({
         >
           <Input
             autoFocus
+            ref={nameInput}
             id={id}
             value={value}
             onChange={(event) => setValue(event.target.value)}

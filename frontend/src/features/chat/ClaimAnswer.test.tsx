@@ -261,7 +261,9 @@ describe('Claim citations', () => {
       screen.getByRole('button', { name: /Open citation 1/ }),
     ).toBeDisabled()
     fireEvent.click(screen.getByText('Sources \u00b7 1 excerpt'))
-    expect(screen.getByRole('button', { name: /Open source 1/ })).toBeDisabled()
+    expect(
+      screen.getByRole('button', { name: /Open original · Page 2: source 1/ }),
+    ).toBeDisabled()
     expect(screen.getByText('Exact quote match')).toBeInTheDocument()
     expect(
       screen.getByText(/original-page navigation is unavailable/),

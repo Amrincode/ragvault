@@ -30,14 +30,18 @@ export function ChatMessage({
         <span className="font-semibold">{user ? 'You' : 'Assistant'}</span>
         <time
           dateTime={message.created_at}
-          aria-label={new Date(message.created_at).toLocaleString()}
           title={new Date(message.created_at).toLocaleString()}
           className="text-xs text-muted"
         >
-          {new Date(message.created_at).toLocaleTimeString(undefined, {
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
+          <span aria-hidden="true">
+            {new Date(message.created_at).toLocaleTimeString(undefined, {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </span>
+          <span className="sr-only">
+            {new Date(message.created_at).toLocaleString()}
+          </span>
         </time>
         {message.status === 'failed' && (
           <Badge tone="danger">Request failed</Badge>

@@ -2,21 +2,38 @@
 
 A local-first document intelligence portfolio project, built in explicit milestones.
 
-See [conversation architecture](docs/architecture/conversations.md) and [Milestone 7 verification](docs/verification-milestone-7.md) for the current lifecycle, context policy, measurements and limitations. [Source citations](docs/architecture/source-citations.md), [Milestone 6 verification](docs/verification-milestone-6.md) and its [reliability investigation](docs/citation-reliability-investigation.md) document the grounding baseline.
+**Milestone 8 UI work is complete through Stage 8.6.** The shared Modern Professional interface covers Dashboard, Documents, AI Chat, Semantic Search and the PDF reader, with Light/Dark/System themes. See the [final QA report](docs/verification-milestone-8-6.md), [Milestone 8 completion summary](docs/milestone-8-summary.md) and [design system](docs/design-system.md).
 
-**Current UI stage: 8.5 — PDF Viewer and Semantic Search.** Search now presents original passages with clear scopes, page references and understated raw cosine scores, explicitly distinguished from factual confidence. The shared single-page PDF reader adds direct page entry, session zoom, fit width and recoverable loading/render errors across Library, Search and both chat modes. Backend retrieval, RAG, citation checks and persistence remain unchanged. See the [design-system guide](docs/design-system.md) and [Stage 8.5 verification](docs/verification-milestone-8-5.md) for tests, sanitized screenshots and limitations. In development, inspect shared components at `/dev/design-system`; the preview is excluded from production builds.
+| Workspace | Implemented behavior |
+| --- | --- |
+| Dashboard | Real API totals, recent documents and separate FastAPI/PostgreSQL/Ollama connectivity checks |
+| Document library | Validated PDF uploads, collections, preview/download, rename/delete, explicit text processing and vector indexing |
+| Semantic search | Collection/document filters, original passages, page references and raw cosine similarity, not confidence |
+| AI chat | Persistent conversations with fixed scopes, bounded follow-ups, unsaved questions, citations and explicit partial/withheld states |
+| PDF reader | Bounded single-page rendering, direct page entry, session zoom, fit width and cancellation/error recovery |
 
-**Application features from Milestones 1–7:** Save scoped document discussions, revisit ordered messages after reload/restart, and use bounded prior user-question topics for fresh-evidence follow-ups. Extractive claims retain numbered source references, checked quotations and original PDF page controls. PDF management, processing, semantic search and stateless chat remain available.
+**Single user. Local machine only. No authentication.** Do not expose this service publicly. This portfolio project is not presented as production-ready; Milestone 9 has not started. Messages and cited excerpts are private local database data, not encrypted conversation storage. Citation wording checks do not guarantee truth, relevance or completeness. Dedicated whole-document summarization and OCR are not implemented; model selection is planned for a future milestone.
 
-**Single user. Local machine only. No authentication. Do not expose this service publicly.** Saved messages and cited excerpts are private local database data, not encrypted conversation storage. Source checks do not prove truth, relevance or completeness. Multi-user access, semantic entailment verification, streaming, OCR and background queues are not implemented.
+![Dashboard with synthetic data](docs/screenshots/stage-8-6/dashboard-light.jpg)
 
-![Document library](docs/screenshots/library-light.jpg)
+| Document library | AI chat with explicit uncertainty |
+| --- | --- |
+| ![PDF library](docs/screenshots/stage-8-6/library-light.jpg) | ![Saved contextual conversation](docs/screenshots/stage-8-6/chat-light.jpg) |
+| Semantic search | PDF reader in Dark theme |
+| ![Original passage search](docs/screenshots/stage-8-6/search-light.jpg) | ![Original PDF reader](docs/screenshots/stage-8-6/pdf-reader-dark.jpg) |
 
-Sanitized visual fixture; the real library displays local API data. Historical milestone screenshots remain in their original reports.
+<details>
+<summary>Dark theme and mobile layout</summary>
 
-![Page-aware text inspector](docs/screenshots/text-chunks.png)
+![Dark dashboard](docs/screenshots/stage-8-6/dashboard-dark.jpg)
 
-See [semantic search architecture](docs/architecture/semantic-search.md), [Milestone 4 verification](docs/verification-milestone-4.md), [PDF processing architecture](docs/architecture/pdf-processing.md), [Milestone 3 verification](docs/verification-milestone-3.md), [document-library foundations](docs/architecture/document-library.md), [Milestone 2 verification](docs/verification-milestone-2.md), and the [historical Milestone 1 report](docs/verification.md).
+<img src="docs/screenshots/stage-8-6/mobile-library.jpg" alt="Document library at a 375-pixel mobile viewport" width="375" />
+
+</details>
+
+All gallery images use disposable synthetic garden documents in an isolated QA workspace. The chat capture intentionally retains its partial-answer warning; the UI does not disguise incomplete or irrelevant output as guaranteed correctness. Historical milestone screenshots remain in their reports.
+
+See [conversation architecture](docs/architecture/conversations.md), [source-citation architecture](docs/architecture/source-citations.md), [semantic search](docs/architecture/semantic-search.md), [PDF processing](docs/architecture/pdf-processing.md) and [library storage](docs/architecture/document-library.md) for policies and implementation details.
 
 ## Stack
 
@@ -131,8 +148,6 @@ Deleting a conversation cascades only its messages and preserves library documen
 See the [conversation architecture](docs/architecture/conversations.md) for endpoints,
 transaction failures, interrupted-turn recovery, privacy and exact limits.
 
-![Saved contextual follow-up](docs/screenshots/saved-conversation.png)
-
 Empty or low-relevance retrieval returns insufficient evidence without calling Gemma.
 With usable passages, the model can still abstain or hallucinate. Milestone 6 requests
 bounded selections of original quotations, without a separate model paraphrase field.
@@ -207,6 +222,8 @@ libc families as a shortcut.** See the [upgrade runbook](docs/architecture/seman
 ## Windows setup or upgrade from earlier milestones
 
 Prerequisites: Python 3.12+, Node.js 24 with npm, Git, Docker Desktop with Linux containers/Compose, and running Ollama with `nomic-embed-text` for indexing/search and `gemma3:4b` for document answers. Library management can operate without Ollama. The tested workstation uses Python 3.12.10 and Node 24.16.0. Existing models are reused; the app does not download or switch to larger models.
+
+Start Docker Desktop with its Linux engine and start Ollama before the application. Check `docker info` and `ollama list`. If a required model is absent on a new installation, pull it explicitly with `ollama pull nomic-embed-text` or `ollama pull gemma3:4b`; reuse installed models on an existing machine.
 
 Commands below are PowerShell. Substitute your checkout path. Existing `.env` settings and database volumes should be retained. `npm.cmd` avoids PowerShell execution-policy problems, and direct virtual-environment Python paths avoid activation requirements.
 

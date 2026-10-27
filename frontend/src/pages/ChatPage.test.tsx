@@ -101,7 +101,7 @@ describe('Document chat', () => {
     await submit()
     await userEvent.click(
       await screen.findByRole('button', {
-        name: 'Open retention.pdf at page 2',
+        name: 'Open original · Page 2: retention.pdf',
       }),
     )
     const signal = vi.mocked(api.getDocument).mock.calls[0][1]!
@@ -179,7 +179,9 @@ describe('Document chat', () => {
     )
     expect(screen.getByText(/Generation 100 ms/)).toBeInTheDocument()
     await userEvent.click(
-      screen.getByRole('button', { name: 'Open retention.pdf at page 2' }),
+      screen.getByRole('button', {
+        name: 'Open original · Page 2: retention.pdf',
+      }),
     )
     expect(await screen.findByRole('dialog')).toHaveTextContent('PDF page 2')
   })

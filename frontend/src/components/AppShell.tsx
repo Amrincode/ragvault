@@ -174,6 +174,9 @@ export function AppShell({
   compact?: boolean
 }) {
   const [navigationOpen, setNavigationOpen] = useState(false)
+  useEffect(() => {
+    document.title = `${page} · RAGVault`
+  }, [page])
   const drawerId = useId()
   const closeNavigation = useCallback(() => setNavigationOpen(false), [])
   function navigateFromDrawer() {

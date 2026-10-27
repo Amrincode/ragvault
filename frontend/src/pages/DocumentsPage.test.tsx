@@ -354,6 +354,35 @@ describe('document library', () => {
     )
   })
 
+  it('returns focus to the invalid name after a rejected save and allows correction', async () => {
+    mount()
+    await screen.findByRole('button', { name: 'Preview paper.pdf' })
+    await userEvent.click(
+      screen.getByRole('button', { name: 'New collection' }),
+    )
+    const input = screen.getByRole('textbox', { name: 'Collection name' })
+    await userEvent.type(input, 'Research')
+    vi.mocked(api.createCollection).mockRejectedValueOnce(
+      new Error('A collection with that name already exists'),
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('already exists')
+    await waitFor(() => expect(input).toHaveFocus())
+    expect(input).toHaveAttribute('aria-invalid', 'true')
+    expect(input).toHaveAccessibleDescription(
+      'A collection with that name already exists',
+    )
+    await userEvent.clear(input)
+    await userEvent.type(input, 'Corrected name')
+    vi.mocked(api.createCollection).mockResolvedValueOnce({
+      ...collection,
+      id: 'corrected',
+      name: 'Corrected name',
+    })
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
   it('uploads a chosen PDF to the selected collection and refreshes', async () => {
     const user = userEvent.setup()
     mount()

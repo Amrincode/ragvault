@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getHealth } from './api'
+import { getHealth, listCollections } from './api'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -9,6 +9,46 @@ const healthy = {
   database: { status: 'connected' },
   ollama: { status: 'connected' },
 }
+
+describe('library API recovery messages', () => {
+  it('explains an unreachable API without exposing the browser fetch error', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(new TypeError('Failed to fetch')),
+    )
+    await expect(listCollections()).rejects.toThrow(
+      'The local API could not be reached. Start FastAPI and retry.',
+    )
+  })
+  it.each([
+    new DOMException('Cancelled', 'AbortError'),
+    new TypeError('Aborted fetch'),
+  ])(
+    'preserves cancellation errors for callers that discard aborted results',
+    async (cause) => {
+      const controller = new AbortController()
+      controller.abort()
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(cause))
+      await expect(listCollections(controller.signal)).rejects.toBe(cause)
+    },
+  )
+  it('preserves safe API validation and recovery messages on HTTP errors', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            detail: { message: 'Document processing is still in progress' },
+          }),
+          { status: 409 },
+        ),
+      ),
+    )
+    await expect(listCollections()).rejects.toThrow(
+      'Document processing is still in progress',
+    )
+  })
+})
 
 describe('health API client', () => {
   it('returns a successful health response', async () => {
