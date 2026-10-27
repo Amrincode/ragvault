@@ -1,6 +1,6 @@
 import os
 from collections.abc import Iterator
-from typing import Annotated
+from typing import Annotated, BinaryIO
 from urllib.parse import quote
 from uuid import UUID
 
@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFi
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+from starlette.types import Receive, Scope, Send
 
 from app.core.errors import api_error
 from app.db.session import get_session
@@ -36,6 +37,20 @@ router = APIRouter(prefix="/api", tags=["library"])
 DB = Annotated[Session, Depends(get_session)]
 Storage = Annotated[DocumentStorage, Depends(get_storage)]
 Processor = Annotated[PdfProcessor, Depends(get_processor)]
+
+
+class _PDFStreamingResponse(StreamingResponse):
+    def __init__(self, content: Iterator[bytes], source: BinaryIO, headers: dict[str, str]) -> None:
+        super().__init__(content, media_type="application/pdf", headers=headers)
+        self._source = source
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            # A disconnected response may leave the body generator suspended (or
+            # never started). Release its Windows file handle without waiting for GC.
+            self._source.close()
 
 
 @router.post("/documents/{document_id}/process", response_model=DocumentResponse)
@@ -186,9 +201,9 @@ def serve_document(
             source.close()
 
     disposition = "attachment" if download else "inline"
-    return StreamingResponse(
+    return _PDFStreamingResponse(
         chunks(),
-        media_type="application/pdf",
+        source,
         headers={
             "Content-Length": str(size),
             "Content-Disposition": (

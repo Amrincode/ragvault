@@ -173,8 +173,7 @@ Use the shared controls or compatible legacy helpers, and retain accessible name
 props, loading states and refs. Recheck both themes, status colors and keyboard focus after
 each migration. Keep PDF/citation text plain and preserve all source/scope protections.
 
-Search and the PDF reader still need their page-specific redesigns. Stage 8.3 retains the
-existing preview and text-inspection behavior. Document technical metadata and rename/
+Stage 8.3 preserves the document processing and text-inspection contracts. Document technical metadata and rename/
 delete controls use an inline native details disclosure, not an overflow menu or popover.
 Recovery controls remain visible outside it. Stage 8.4 adds a desktop conversation panel,
 a native mobile history dialog, scoped creation controls, an anchored composer and clear
@@ -187,5 +186,30 @@ disclosure per answer groups identical source/page/quote/check metadata, without
 different quotes or renumbering references. Partial, withheld and historical-source
 warnings remain explicit; detailed checks and withheld statements expand separately.
 Original excerpts and model output remain plain text. No retrieval, model, validation,
-scope or persistence contracts change. Stage 8.5 has not started.
+scope or persistence contracts change.
 Do not infer new data, API or model behavior from a visual foundation change.
+
+
+## Stage 8.5: search and shared PDF reader
+
+Search uses shared controls and semantic surfaces for the query, real collection/document
+filters, result count and plain original passages. Ordered cards identify their document,
+collection and original page. Raw cosine similarity is secondary metadata, explicitly
+explained as embedding similarity rather than factual confidence or answer correctness.
+Filter failures block submission until recovery; loading, empty, request failure and
+incompatible-index states retain honest recovery guidance.
+
+The native Dialog has an opt-in reader size; other dialogs keep their existing layout.
+The reader offers direct page entry, previous/next, session-only 50–200% visual zoom,
+fit width, separate load/render retries and an original download. Controls wrap on phones,
+retain full accessible names, and stay sticky during short-window dialog scrolling.
+The heading is limited to two visual lines with full accessible text/native title; a
+full-width File details disclosure exposes the complete filename on touch devices.
+
+PDF paper stays white in both themes. Zoom magnifies a bounded bitmap rather than claiming
+full-resolution or selectable text. Keep one page/canvas, the local PDF.js worker/assets,
+page cleanup and cancellation before canvas reuse. Pan inside the named focusable PDF
+viewport; reserve scrollbar space to prevent resize/render feedback loops. Search and
+citation actions retain exact document IDs/pages; stale or unavailable historical sources
+remain disabled. Highlighting, text layers, OCR and annotations are deferred. See the
+[Stage 8.5 verification](verification-milestone-8-5.md) for measurements and accessibility limits.

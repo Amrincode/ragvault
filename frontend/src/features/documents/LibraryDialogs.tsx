@@ -323,40 +323,75 @@ export function PreviewDialog({
   onClose: () => void
   initialPage?: number
 }) {
-  const [blob, setBlob] = useState<Blob | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [file, setFile] = useState<{
+    id: string
+    attempt: number
+    blob?: Blob
+    error?: string
+  } | null>(null)
+  const [attempt, setAttempt] = useState(0)
+  const current =
+    file?.id === document.id && file.attempt === attempt ? file : null
+  const blob = current?.blob
+  const error = current?.error
   useEffect(() => {
     const controller = new AbortController()
     void getDocumentPDF(document.id, controller.signal)
       .then((blob) => {
         if (!controller.signal.aborted) {
-          setBlob(blob)
+          setFile({ id: document.id, attempt, blob })
         }
       })
       .catch((cause: unknown) => {
-        if (!controller.signal.aborted) setError(errorMessage(cause))
+        if (!controller.signal.aborted)
+          setFile({ id: document.id, attempt, error: errorMessage(cause) })
       })
     return () => {
       controller.abort()
     }
-  }, [document.id])
+  }, [document.id, attempt])
   return (
-    <Dialog title={document.filename} onClose={onClose} wide>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-xs text-muted">
-        <span>Original PDF · {formatBytes(document.file_size)}</span>
-        <a
-          href={documentDownloadUrl(document.id)}
-          className="secondary-button"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Download original
-        </a>
+    <Dialog title={document.filename} onClose={onClose} reader>
+      <div className="mb-4 min-w-0 text-meta text-muted">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+          <span>Original PDF · {formatBytes(document.file_size)}</span>
+          <a
+            href={documentDownloadUrl(document.id)}
+            className="secondary-button"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Download original
+          </a>
+        </div>
+        <details className="mt-1">
+          <summary className="min-h-8 cursor-pointer py-1">
+            File details
+          </summary>
+          <p className="mt-1 break-words [overflow-wrap:anywhere]">
+            {document.filename}
+          </p>
+          <p className="mt-2 text-meta leading-6">
+            Zoom magnifies a limited-resolution preview. Download the original
+            for full-resolution viewing and selectable text.
+          </p>
+        </details>
       </div>
       {error ? (
-        <p role="alert" className="error-message">
-          {error}
-        </p>
+        <div className="space-y-3">
+          <p role="alert" className="error-message">
+            {error}
+          </p>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setFile(null)
+              setAttempt((value) => value + 1)
+            }}
+          >
+            Retry original PDF
+          </Button>
+        </div>
       ) : blob ? (
         <Suspense fallback={<p role="status">Loading PDF renderer…</p>}>
           <PdfPreview
@@ -371,8 +406,8 @@ export function PreviewDialog({
         </p>
       )}
       <p className="mt-3 text-xs text-muted">
-        PDF.js renders one page at a time. Download the original for printing,
-        text selection, or interactive PDF features.
+        Single-page image preview. Download the original for selectable text,
+        printing and full PDF features.
       </p>
     </Dialog>
   )

@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { AppShell } from '../components/AppShell'
+import { Icon } from '../components/Icon'
+import { Button } from '../components/ui/Button'
+import { Input } from '../components/ui/Input'
+import { FormField } from '../components/ui/FormField'
+import { Badge } from '../components/ui/Badge'
+import { EmptyState } from '../components/ui/EmptyState'
+import { LoadingIndicator } from '../components/ui/LoadingIndicator'
 import { PreviewDialog } from '../features/documents/LibraryDialogs'
 import {
   getDocument,
@@ -11,8 +18,12 @@ import {
 import type { Collection, Document, DocumentPage } from '../types/library'
 import type { SearchHit, SearchResponse } from '../types/search'
 
+const explain = (cause: unknown, fallback: string) =>
+  cause instanceof Error ? cause.message : fallback
+
 export function SearchPage() {
   const [query, setQuery] = useState('')
+  const [submittedQuery, setSubmittedQuery] = useState('')
   const [collections, setCollections] = useState<Collection[]>([])
   const [collection, setCollection] = useState('')
   const [document, setDocument] = useState('')
@@ -21,13 +32,18 @@ export function SearchPage() {
   const [topK, setTopK] = useState(5)
   const [busy, setBusy] = useState(false)
   const [loadingFilters, setLoadingFilters] = useState(true)
+  const [filterError, setFilterError] = useState<string | null>(null)
+  const [filterAttempt, setFilterAttempt] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<SearchResponse | null>(null)
   const [preview, setPreview] = useState<{
     document: Document
     page: number
   } | null>(null)
+  const [opening, setOpening] = useState<string | null>(null)
   const active = useRef<AbortController | null>(null)
+  const previewRequest = useRef<AbortController | null>(null)
+
   useEffect(() => {
     const controller = new AbortController()
     void Promise.all([
@@ -38,33 +54,42 @@ export function SearchPage() {
         if (!controller.signal.aborted) {
           setCollections(nextCollections)
           setDocuments(nextDocuments)
+          setFilterError(null)
         }
       })
       .catch((cause: unknown) => {
         if (!controller.signal.aborted)
-          setError(
-            cause instanceof Error
-              ? cause.message
-              : 'Unable to load search filters',
-          )
+          setFilterError(explain(cause, 'Unable to load search filters'))
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoadingFilters(false)
       })
     return () => controller.abort()
-  }, [collection, offset])
-  useEffect(() => () => active.current?.abort(), [])
+  }, [collection, offset, filterAttempt])
+  useEffect(
+    () => () => {
+      active.current?.abort()
+      previewRequest.current?.abort()
+    },
+    [],
+  )
+
+  function clearResults() {
+    previewRequest.current?.abort()
+    setPreview(null)
+    setOpening(null)
+    setResult(null)
+    setError(null)
+  }
   async function search() {
-    if (!query.trim()) {
-      setError('Enter a search question')
+    if (busy || loadingFilters || filterError || !documents || !query.trim())
       return
-    }
     active.current?.abort()
     const controller = new AbortController()
     active.current = controller
+    clearResults()
     setBusy(true)
-    setError(null)
-    setResult(null)
+    setSubmittedQuery(query.trim())
     try {
       const next = await searchPassages(
         {
@@ -77,66 +102,98 @@ export function SearchPage() {
       )
       if (!controller.signal.aborted) setResult(next)
     } catch (cause) {
-      if (!controller.signal.aborted)
-        setError(cause instanceof Error ? cause.message : 'Search failed')
+      if (!controller.signal.aborted) setError(explain(cause, 'Search failed'))
     } finally {
       if (!controller.signal.aborted) setBusy(false)
     }
   }
   async function openOriginal(hit: SearchHit) {
+    if (opening === hit.chunk_id) return
+    previewRequest.current?.abort()
+    const controller = new AbortController()
+    previewRequest.current = controller
+    setOpening(hit.chunk_id)
+    setError(null)
     try {
-      setPreview({
-        document: await getDocument(hit.document_id),
-        page: hit.page_number,
-      })
+      const original = await getDocument(hit.document_id, controller.signal)
+      if (!controller.signal.aborted)
+        setPreview({ document: original, page: hit.page_number })
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : 'Original PDF unavailable',
-      )
+      if (!controller.signal.aborted)
+        setError(explain(cause, 'Original PDF unavailable'))
+    } finally {
+      if (!controller.signal.aborted) setOpening(null)
     }
   }
+  function pageOptions(next: number) {
+    setOffset(next)
+    setDocument('')
+    setDocuments(null)
+    setLoadingFilters(true)
+    setFilterError(null)
+    clearResults()
+  }
+
   return (
     <AppShell page="Semantic search">
-      <p className="eyebrow">PASSAGES FROM YOUR DOCUMENTS</p>
-      <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-        Semantic search
-      </h1>
-      <p className="mt-3 max-w-2xl text-sm leading-6 text-muted">
-        Find indexed passages using natural-language questions. Results are
-        original excerpts with page references; no answer is generated.
-      </p>
-      <p className="mt-4 text-xs leading-5 text-muted">
-        Upload → Process text → Index for search → Search. Manage indexing in{' '}
-        <Link className="font-semibold text-forest underline" to="/documents">
-          Documents
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-2xl">
+          <p className="eyebrow">DISCOVER YOUR EVIDENCE</p>
+          <h1 className="mt-1 text-page font-semibold">Semantic search</h1>
+          <p className="mt-3 text-body leading-7 text-muted">
+            Find ideas in your indexed PDFs using a natural-language question.
+            Results are original excerpts with page references; no answer is
+            generated.
+          </p>
+        </div>
+        <Link className="secondary-button" to="/documents">
+          <Icon name="documents" />
+          Open document library
         </Link>
-        . Everything runs locally.
-      </p>
+      </div>
       <form
-        className="mt-7 space-y-5 rounded-2xl border border-line bg-surface p-6"
+        className="rounded-card border border-line bg-surface p-4 sm:p-6"
         onSubmit={(event) => {
           event.preventDefault()
           void search()
         }}
       >
-        <label className="block text-sm font-medium" htmlFor="search-query">
+        <label htmlFor="search-query" className="form-label mb-2">
           Search question
         </label>
-        <textarea
-          id="search-query"
-          className="w-full rounded-xl border border-control-border p-3 text-sm"
-          rows={3}
-          maxLength={2000}
-          placeholder="How does the document describe data backups?"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          disabled={busy}
-        />
-        <div className="flex flex-wrap gap-4">
-          <label className="min-w-40 flex-1 text-xs font-medium">
-            Collection
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="relative min-w-0 flex-1">
+            <Icon
+              name="search"
+              className="pointer-events-none absolute top-3 left-3 text-muted"
+            />
+            <Input
+              id="search-query"
+              type="search"
+              maxLength={2000}
+              required
+              className="min-h-11 pl-10!"
+              placeholder="Find a specific idea in your indexed PDFs…"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              disabled={busy}
+            />
+          </div>
+          <Button
+            type="submit"
+            size="lg"
+            loading={busy}
+            disabled={
+              !query.trim() || loadingFilters || !!filterError || !documents
+            }
+          >
+            {busy ? 'Searching…' : 'Search passages'}
+          </Button>
+        </div>
+        <div className="mt-5 grid min-w-0 gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem]">
+          <FormField label="Collection">
             <select
-              className="mt-2 block w-full rounded-lg border border-control-border p-2"
+              className="text-input min-w-0"
               aria-label="Collection filter"
               value={collection}
               disabled={busy || loadingFilters}
@@ -146,7 +203,8 @@ export function SearchPage() {
                 setOffset(0)
                 setDocuments(null)
                 setLoadingFilters(true)
-                setResult(null)
+                setFilterError(null)
+                clearResults()
               }}
             >
               <option value="">All collections</option>
@@ -156,17 +214,16 @@ export function SearchPage() {
                 </option>
               ))}
             </select>
-          </label>
-          <label className="min-w-40 flex-1 text-xs font-medium">
-            Document
+          </FormField>
+          <FormField label="Document">
             <select
-              className="mt-2 block w-full rounded-lg border border-control-border p-2"
+              className="text-input min-w-0"
               aria-label="Document filter"
               value={document}
-              disabled={busy || loadingFilters}
+              disabled={busy || loadingFilters || !documents}
               onChange={(event) => {
                 setDocument(event.target.value)
-                setResult(null)
+                clearResults()
               }}
             >
               <option value="">All documents</option>
@@ -176,126 +233,180 @@ export function SearchPage() {
                 </option>
               ))}
             </select>
-          </label>
-          <label className="text-xs font-medium">
-            Results
-            <input
+          </FormField>
+          <FormField label="Results">
+            <Input
               aria-label="Maximum results"
               type="number"
               min={1}
               max={20}
-              className="mt-2 block w-20 rounded-lg border border-control-border p-2"
+              step={1}
+              required
               value={topK}
               disabled={busy}
               onChange={(event) => setTopK(Number(event.target.value))}
             />
-          </label>
+          </FormField>
         </div>
         {documents && documents.total > 100 && (
-          <div className="flex items-center gap-3 text-xs text-muted">
-            <button
-              className="secondary-button"
-              type="button"
+          <div className="mt-4 flex flex-wrap items-center gap-3 text-meta text-muted">
+            <Button
+              variant="secondary"
+              size="sm"
               disabled={busy || loadingFilters || offset === 0}
-              onClick={() => {
-                setOffset(Math.max(0, offset - 100))
-                setDocument('')
-                setResult(null)
-                setLoadingFilters(true)
-              }}
+              onClick={() => pageOptions(Math.max(0, offset - 100))}
             >
               Previous document options
-            </button>
+            </Button>
             <span>
               {offset + 1}–{Math.min(offset + 100, documents.total)} of{' '}
               {documents.total} documents
             </span>
-            <button
-              className="secondary-button"
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               disabled={
                 busy || loadingFilters || offset + 100 >= documents.total
               }
-              onClick={() => {
-                setOffset(offset + 100)
-                setDocument('')
-                setResult(null)
-                setLoadingFilters(true)
-              }}
+              onClick={() => pageOptions(offset + 100)}
             >
               Next document options
-            </button>
+            </Button>
           </div>
         )}
-        <button
-          className="primary-button"
-          type="submit"
-          disabled={busy || !query.trim() || loadingFilters}
-        >
-          {busy ? 'Searching…' : 'Search passages'}
-        </button>
+        <p className="mt-4 text-meta leading-6 text-muted">
+          Search uses indexed passages only. Upload, process text and index for
+          search in{' '}
+          <Link className="font-medium text-accent underline" to="/documents">
+            Documents
+          </Link>
+          . Everything runs locally.
+        </p>
       </form>
+      {filterError && (
+        <div role="alert" className="error-message mt-4">
+          {filterError}
+          <Button
+            variant="secondary"
+            size="sm"
+            className="mt-2 ml-2"
+            onClick={() => {
+              setLoadingFilters(true)
+              setFilterError(null)
+              setFilterAttempt((value) => value + 1)
+            }}
+          >
+            Retry search filters
+          </Button>
+        </div>
+      )}
       {error && (
-        <p role="alert" className="error-message mt-5">
+        <p role="alert" className="error-message mt-4">
           {error}
         </p>
       )}
-      {busy && (
-        <p role="status" className="mt-6 text-sm text-muted">
-          Embedding your question and searching indexed passages…
-        </p>
-      )}
+      {busy ? (
+        <div className="mt-6 rounded-card border border-line bg-surface p-6">
+          <LoadingIndicator label="Embedding your question and searching indexed passages…" />
+        </div>
+      ) : loadingFilters ? (
+        <div className="mt-5">
+          <LoadingIndicator label="Loading search filters…" />
+        </div>
+      ) : !result && !error && !filterError ? (
+        <div className="mt-6">
+          <EmptyState
+            icon={<Icon name="search" className="size-7" />}
+            title="Find the passage behind an idea"
+            description="Ask a focused question, narrow the document scope if needed, then open an original page to read its context."
+          />
+        </div>
+      ) : null}
       {result && (
-        <section className="mt-7" aria-label="Search results">
-          <p className="mb-4 text-xs text-muted">
-            {result.items.length} passages · {result.elapsed_ms.toFixed(0)} ms ·{' '}
-            {result.model}
+        <section className="mt-7 min-w-0 space-y-4" aria-label="Search results">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="break-words text-section font-semibold [overflow-wrap:anywhere]">
+                Results for “{submittedQuery}”
+              </h2>
+              <p role="status" className="mt-1 text-meta text-muted">
+                {result.items.length}{' '}
+                {result.items.length === 1 ? 'passage' : 'passages'} ·{' '}
+                {result.elapsed_ms.toFixed(0)} ms
+              </p>
+            </div>
+            <details className="max-w-full text-meta text-muted">
+              <summary className="min-h-9 cursor-pointer py-1">
+                Search details
+              </summary>
+              <p className="mt-1 break-words">
+                {result.model} · {result.dimensions} dimensions · up to{' '}
+                {result.top_k} results
+              </p>
+            </details>
+          </div>
+          <p className="text-meta leading-6 text-muted">
+            Cosine similarity measures embedding similarity, not factual
+            confidence or answer correctness. Read the original page to assess
+            the evidence.
           </p>
           {result.incompatible_documents > 0 && (
-            <p className="mb-4 rounded-lg bg-warning-soft p-3 text-xs text-warning">
+            <p className="rounded-control border border-warning-border bg-warning-soft p-3 text-sm text-warning">
               {result.incompatible_documents} indexed documents use a different
               embedding model or settings and were excluded. Reindex them in
               Documents.
             </p>
           )}
           {!result.items.length ? (
-            <div className="rounded-xl border border-dashed border-line bg-surface p-8 text-sm text-muted">
-              No matching indexed passages. Process and index documents, check
-              the filters, or try another question.
-            </div>
+            <EmptyState
+              title="No matching indexed passages"
+              description="Process and index documents, check the filters, or try another question."
+            />
           ) : (
             <ol className="space-y-4">
-              {result.items.map((hit) => (
+              {result.items.map((hit, index) => (
                 <li
                   key={hit.chunk_id}
-                  className="rounded-xl border border-line bg-surface p-5"
+                  className="min-w-0 rounded-card border border-line bg-surface p-4 sm:p-6"
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h2 className="break-words text-sm font-semibold">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span
+                      className="grid size-9 shrink-0 place-items-center rounded-control bg-accent-soft text-sm font-semibold text-accent"
+                      aria-label={`Result ${index + 1}`}
+                    >
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="break-words text-base font-semibold [overflow-wrap:anywhere]">
                         {hit.filename}
-                      </h2>
-                      <p className="mt-1 text-xs text-muted">
-                        Page {hit.page_number} ·{' '}
-                        {collections.find((c) => c.id === hit.collection_id)
-                          ?.name ?? 'Collection'}
+                      </h3>
+                      <p className="mt-1 break-words text-meta text-muted">
+                        Page {hit.page_number}
+                        {collections.find(
+                          (item) => item.id === hit.collection_id,
+                        )?.name
+                          ? ` · ${collections.find((item) => item.id === hit.collection_id)!.name}`
+                          : ''}
                       </p>
                     </div>
-                    <span className="text-xs text-muted">
-                      Cosine similarity {hit.similarity.toFixed(3)}
-                    </span>
                   </div>
-                  <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-6">
+                  <blockquote className="mt-4 whitespace-pre-wrap break-words border-l-2 border-line pl-4 text-body leading-7 [overflow-wrap:anywhere]">
                     {hit.excerpt}
-                  </p>
-                  <button
-                    className="secondary-button mt-4"
-                    type="button"
-                    onClick={() => void openOriginal(hit)}
-                    aria-label={`Open ${hit.filename} at page ${hit.page_number}`}
-                  >
-                    Open original · Page {hit.page_number}
-                  </button>
+                  </blockquote>
+                  <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+                    <Button
+                      variant="secondary"
+                      aria-busy={opening === hit.chunk_id || undefined}
+                      onClick={() => void openOriginal(hit)}
+                      aria-label={`Open ${hit.filename} at page ${hit.page_number}`}
+                    >
+                      <Icon name="arrow" className="size-4" />
+                      {opening === hit.chunk_id
+                        ? 'Opening original…'
+                        : `Open original · Page ${hit.page_number}`}
+                    </Button>
+                    <Badge>Cosine similarity {hit.similarity.toFixed(3)}</Badge>
+                  </div>
                 </li>
               ))}
             </ol>
@@ -307,7 +418,10 @@ export function SearchPage() {
           key={`${preview.document.id}:${preview.page}`}
           document={preview.document}
           initialPage={preview.page}
-          onClose={() => setPreview(null)}
+          onClose={() => {
+            previewRequest.current?.abort()
+            setPreview(null)
+          }}
         />
       )}
     </AppShell>

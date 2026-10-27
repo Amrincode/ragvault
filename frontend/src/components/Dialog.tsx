@@ -6,12 +6,14 @@ export function Dialog({
   onClose,
   busy = false,
   wide = false,
+  reader = false,
 }: {
   title: string
   children: ReactNode
   onClose: () => void
   busy?: boolean
   wide?: boolean
+  reader?: boolean
 }) {
   const reference = useRef<HTMLDialogElement>(null)
   const heading = useId()
@@ -40,12 +42,13 @@ export function Dialog({
         event.preventDefault()
         if (!busy) onClose()
       }}
-      className={`m-auto max-h-[92vh] w-[calc(100%-2rem)] overflow-auto rounded-2xl border border-line bg-elevated p-6 text-ink shadow-card backdrop:bg-overlay/70 ${wide ? 'max-w-5xl' : 'max-w-md'}`}
+      className={`m-auto overflow-auto rounded-2xl border border-line bg-elevated text-ink shadow-card backdrop:bg-overlay/70 ${reader ? 'max-h-[96dvh] w-[calc(100%-1rem)] max-w-6xl p-3 [scrollbar-gutter:stable] sm:p-5' : `max-h-[92vh] w-[calc(100%-2rem)] p-6 ${wide ? 'max-w-5xl' : 'max-w-md'}`}`}
     >
       <div className="mb-5 flex items-center justify-between gap-4">
         <h2
           id={heading}
-          className="min-w-0 break-words text-section font-semibold"
+          className={`min-w-0 break-words text-section font-semibold ${reader ? 'line-clamp-2 [overflow-wrap:anywhere]' : ''}`}
+          title={reader ? title : undefined}
         >
           {title}
         </h2>

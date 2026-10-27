@@ -1,17 +1,21 @@
+import asyncio
 import hashlib
 import subprocess
 from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pymupdf
 import pytest
+from fastapi import Request
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
+from starlette.requests import ClientDisconnect
 
+from app.api.library import serve_document
 from app.core.config import Settings
 from app.db.base import Base
 from app.main import create_app
@@ -266,6 +270,75 @@ def test_delete_move_failure_keeps_record_and_file(
         result = library_client.delete(f"/api/documents/{document['id']}")
     assert result.status_code == 503
     assert library_client.get(f"/api/documents/{document['id']}/file").content == pdf_bytes
+
+
+@pytest.mark.parametrize("outcome", ["complete", "headers", "body", "cancel", "disconnect"])
+def test_pdf_response_closes_file_before_deletion(
+    library_client: TestClient, pdf_bytes: bytes, outcome: str
+) -> None:
+    group = collection(library_client)
+    document = upload(library_client, group["id"], pdf_bytes).json()
+    storage = library_client.app.state.storage
+    path = stored_files(library_client)[0]
+    source = path.open("rb")
+    with (
+        Session(library_client.app.state.engine) as session,
+        patch.object(storage, "open_pdf", return_value=source),
+    ):
+        response = serve_document(
+            UUID(document["id"]),
+            session,
+            storage,
+            Request({"type": "http", "app": library_client.app}),
+        )
+
+    async def exercise_response() -> None:
+        body_sent = asyncio.Event()
+
+        async def receive():
+            await body_sent.wait()
+            return {"type": "http.disconnect"}
+
+        async def send(message):
+            if outcome == "headers" and message["type"] == "http.response.start":
+                raise OSError("Synthetic closed connection")
+            if message["type"] == "http.response.body":
+                if outcome == "body":
+                    raise OSError("Synthetic closed connection")
+                if outcome == "cancel":
+                    raise asyncio.CancelledError
+                if outcome == "disconnect":
+                    body_sent.set()
+                    # Keep the body iterator open until the disconnect is delivered.
+                    await asyncio.Event().wait()
+
+        scope = {
+            "type": "http",
+            "asgi": {"spec_version": "2.3" if outcome == "disconnect" else "2.4"},
+        }
+        try:
+            await response(scope, receive, send)
+        finally:
+            # Check before asyncio.run shuts down async generators on our behalf.
+            assert source.closed
+
+    try:
+        if outcome in {"headers", "body"}:
+            with pytest.raises(ClientDisconnect):
+                asyncio.run(exercise_response())
+        elif outcome == "cancel":
+            with pytest.raises(asyncio.CancelledError):
+                asyncio.run(exercise_response())
+        else:
+            asyncio.run(exercise_response())
+        # Retain the response/iterator: closure must not depend on garbage collection.
+        assert source.closed
+        assert response.headers["content-length"] == str(len(pdf_bytes))
+        assert library_client.delete(f"/api/documents/{document['id']}").status_code == 204
+        assert library_client.get(f"/api/documents/{document['id']}").status_code == 404
+        assert not path.exists() and not list(storage.trash.iterdir())
+    finally:
+        source.close()
 
 
 def test_missing_file_can_be_removed_from_library(

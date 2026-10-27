@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -170,7 +170,7 @@ describe('semantic search', () => {
     expect(await screen.findByRole('dialog')).toHaveTextContent(
       'Original PDF at page 2',
     )
-    expect(api.getDocument).toHaveBeenCalledWith('doc')
+    expect(api.getDocument).toHaveBeenCalledWith('doc', expect.any(AbortSignal))
   })
   it('shows empty results without invented passages', async () => {
     vi.mocked(api.searchPassages).mockResolvedValue({ ...result, items: [] })
@@ -249,5 +249,158 @@ describe('semantic search', () => {
       0,
       expect.any(AbortSignal),
     )
+  })
+  it('explains raw cosine similarity without presenting a confidence percentage', async () => {
+    mount()
+    await query()
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Search passages' }),
+    )
+    expect(
+      await screen.findByText(/not factual confidence or answer correctness/),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Cosine similarity 0.900')).toBeInTheDocument()
+    expect(screen.queryByText('90%')).toBeNull()
+    expect(
+      screen.getByRole('region', { name: 'Search results' }),
+    ).toHaveTextContent(result.items[0].excerpt)
+  })
+  it('keeps displayed results tied to the submitted query while a new query is drafted', async () => {
+    mount()
+    await query()
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Search passages' }),
+    )
+    await screen.findByRole('heading', { name: /Results for/ })
+    await userEvent.clear(screen.getByLabelText('Search question'))
+    await userEvent.type(
+      screen.getByLabelText('Search question'),
+      'A different draft',
+    )
+    expect(
+      screen.getByRole('heading', { name: /Results for/ }),
+    ).toHaveTextContent('revenue growth')
+    expect(api.searchPassages).toHaveBeenCalledOnce()
+  })
+  it('blocks unavailable filters and retries them without silently broadening a scope', async () => {
+    vi.mocked(api.listCollections).mockRejectedValueOnce(
+      new Error('Filters unavailable'),
+    )
+    mount()
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Filters unavailable',
+    )
+    await userEvent.type(
+      screen.getByLabelText('Search question'),
+      'Scoped question',
+    )
+    expect(
+      screen.getByRole('button', { name: 'Search passages' }),
+    ).toBeDisabled()
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Retry search filters' }),
+    )
+    await screen.findByRole('option', { name: 'finance.pdf' })
+    expect(
+      screen.getByRole('button', { name: 'Search passages' }),
+    ).toBeEnabled()
+    expect(api.searchPassages).not.toHaveBeenCalled()
+  })
+  it('submits the supported result limit and rejects a value outside its bounds', async () => {
+    mount()
+    await query()
+    const limit = screen.getByRole('spinbutton', { name: 'Maximum results' })
+    fireEvent.change(limit, { target: { value: '21' } })
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Search passages' }),
+    )
+    expect(api.searchPassages).not.toHaveBeenCalled()
+    fireEvent.change(limit, { target: { value: '3' } })
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Search passages' }),
+    )
+    await waitFor(() =>
+      expect(api.searchPassages).toHaveBeenCalledWith(
+        expect.objectContaining({ top_k: 3 }),
+        expect.any(AbortSignal),
+      ),
+    )
+  })
+  it('cancels a source lookup when filters change and ignores its late response', async () => {
+    let finish!: (value: Document) => void
+    vi.mocked(api.getDocument).mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+    )
+    mount()
+    await query()
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Search passages' }),
+    )
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Open finance.pdf at page 2' }),
+    )
+    const signal = vi.mocked(api.getDocument).mock.calls[0][1]!
+    await userEvent.selectOptions(
+      screen.getByLabelText('Collection filter'),
+      'collection',
+    )
+    expect(signal.aborted).toBe(true)
+    await act(async () => finish(document))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Search results' })).toBeNull()
+  })
+  it('reports an unavailable original without inventing a preview and permits a retry', async () => {
+    vi.mocked(api.getDocument).mockRejectedValueOnce(
+      new Error('Original PDF unavailable'),
+    )
+    mount()
+    await query()
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Search passages' }),
+    )
+    const button = await screen.findByRole('button', {
+      name: 'Open finance.pdf at page 2',
+    })
+    await userEvent.click(button)
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Original PDF unavailable',
+    )
+    expect(screen.queryByRole('dialog')).toBeNull()
+    await userEvent.click(button)
+    expect(await screen.findByRole('dialog')).toHaveTextContent(
+      'Original PDF at page 2',
+    )
+  })
+  it('aborts outstanding search and source requests when leaving the page', async () => {
+    vi.mocked(api.searchPassages).mockReturnValueOnce(new Promise(() => {}))
+    const view = mount()
+    await query()
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Search passages' }),
+    )
+    const signal = vi.mocked(api.searchPassages).mock.calls[0][1]!
+    view.unmount()
+    expect(signal.aborted).toBe(true)
+  })
+  it('retains complete long filenames, original excerpts and page metadata as inert text', async () => {
+    const filename = 'Synthetic-long-filename-'.repeat(15) + '.pdf'
+    vi.mocked(api.searchPassages).mockResolvedValue({
+      ...result,
+      items: [{ ...result.items[0], filename }],
+    })
+    const view = mount()
+    await query()
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Search passages' }),
+    )
+    expect(
+      await screen.findByRole('heading', { name: filename }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Open ' + filename + ' at page 2' }),
+    ).toBeInTheDocument()
+    expect(view.container.querySelector('script')).toBeNull()
   })
 })
