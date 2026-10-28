@@ -87,3 +87,73 @@ def test_upload_directory_is_relative_to_repository() -> None:
 def test_upload_limits_must_be_positive(field: str) -> None:
     with pytest.raises(ValidationError):
         Settings(_env_file=None, postgres_password="test", **{field: 0})
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "postgres_host",
+        "postgres_db",
+        "postgres_user",
+        "backend_host",
+        "postgres_password",
+        "ollama_chat_model",
+        "ollama_embedding_model",
+    ],
+)
+def test_blank_connection_and_model_settings_rejected(field):
+    values = {"postgres_password": "test", field: "   "}
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, **values)
+
+
+@pytest.mark.parametrize(
+    "host", ["http://localhost", "local host", "localhost/private", "localhost:8000"]
+)
+def test_malformed_bind_host_rejected(host):
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, postgres_password="test", backend_host=host)
+
+
+def test_password_whitespace_is_preserved_when_nonblank():
+    assert (
+        Settings(_env_file=None, postgres_password=" pass ").postgres_password.get_secret_value()
+        == " pass "
+    )
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://user:private@localhost:11434",
+        "http://localhost:11434?token=private",
+        "http://localhost:11434#private",
+    ],
+)
+def test_ollama_url_rejects_hidden_credentials_without_echoing_input(url):
+    with pytest.raises(ValidationError) as failure:
+        Settings(_env_file=None, postgres_password="test", ollama_base_url=url)
+    assert "private" not in str(failure.value)
+
+
+def test_combined_validation_error_does_not_echo_secret_input():
+    with pytest.raises(ValidationError) as failure:
+        Settings(_env_file=None, postgres_password="private-value", chunk_overlap_chars=1500)
+    assert "private-value" not in str(failure.value)
+
+
+def test_cli_configuration_failure_is_redacted(monkeypatch, capsys):
+    from app.__main__ import main
+    from app.core.config import get_settings
+
+    monkeypatch.setattr("sys.argv", ["app"])
+    monkeypatch.setenv("BACKEND_PORT", "private-input")
+    get_settings.cache_clear()
+    try:
+        with pytest.raises(SystemExit) as code:
+            main()
+        assert code.value.code == 2
+        output = capsys.readouterr().err
+        assert "BACKEND_PORT" in output and "private-input" not in output
+    finally:
+        get_settings.cache_clear()

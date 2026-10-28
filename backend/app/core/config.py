@@ -1,9 +1,11 @@
+import re
 from functools import lru_cache
+from ipaddress import ip_address
 from pathlib import Path
 from typing import Literal
 
-from pydantic import AnyHttpUrl, Field, SecretStr, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import AnyHttpUrl, Field, SecretStr, ValidationError, field_validator, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict, SettingsError
 from sqlalchemy import URL
 
 ROOT_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
@@ -11,7 +13,7 @@ ROOT_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=ROOT_ENV_FILE, env_file_encoding="utf-8", extra="ignore"
+        env_file=ROOT_ENV_FILE, env_file_encoding="utf-8", extra="ignore", hide_input_in_errors=True
     )
 
     app_env: Literal["development", "test", "production"] = "development"
@@ -65,6 +67,46 @@ class Settings(BaseSettings):
     conversation_history_chars: int = Field(default=600, ge=0, le=2000)
     conversation_max_messages: int = Field(default=500, ge=2, le=10000)
 
+    @field_validator("postgres_password")
+    @classmethod
+    def validate_password(cls, value: SecretStr) -> SecretStr:
+        if not value.get_secret_value().strip():
+            raise ValueError("POSTGRES_PASSWORD must not be blank")
+        return value
+
+    @field_validator("backend_host", "postgres_host", "postgres_db", "postgres_user")
+    @classmethod
+    def validate_connection_fields(cls, value: str) -> str:
+        if not value.strip() or "\x00" in value:
+            raise ValueError("Connection settings must not be blank or contain NUL")
+        return value
+
+    @field_validator("backend_host")
+    @classmethod
+    def validate_bind_host(cls, value: str) -> str:
+        try:
+            ip_address(value)
+        except ValueError:
+            if not re.fullmatch(r"[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?", value):
+                raise ValueError("BACKEND_HOST must be an IP address or hostname") from None
+        return value
+
+    @field_validator("ollama_chat_model", "ollama_embedding_model")
+    @classmethod
+    def validate_model_names(cls, value: str) -> str:
+        if not value or len(value) > 200 or any(c.isspace() or ord(c) < 32 for c in value):
+            raise ValueError(
+                "Model names must not be empty or contain whitespace/control characters"
+            )
+        return value
+
+    @field_validator("ollama_base_url")
+    @classmethod
+    def validate_ollama_url(cls, value: AnyHttpUrl) -> AnyHttpUrl:
+        if value.username or value.password or value.query or value.fragment:
+            raise ValueError("OLLAMA_BASE_URL must not contain credentials, query or fragment")
+        return value
+
     @model_validator(mode="after")
     def validate_chunking(self) -> "Settings":
         if self.chunk_overlap_chars >= self.chunk_size_chars:
@@ -110,4 +152,22 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    try:
+        return Settings()
+    except ValidationError as exc:
+        fields = sorted(
+            {str(e["loc"][0]).upper() if e["loc"] else "SETTINGS" for e in exc.errors()}
+        )
+        raise ConfigurationError(
+            "Missing or invalid configuration: "
+            + ", ".join(fields)
+            + ". Check process environment overrides and the root .env against .env.example."
+        ) from None
+    except (SettingsError, OSError, UnicodeError):
+        raise ConfigurationError(
+            "Configuration could not be read. Check root .env encoding, syntax and permissions."
+        ) from None
+
+
+class ConfigurationError(ValueError):
+    """Safe public diagnostic without input values or raw validation exceptions."""

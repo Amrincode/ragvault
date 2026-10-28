@@ -44,13 +44,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         engine = build_engine(config)
         app.state.engine = engine
         app.state.settings = config
-        app.state.storage = DocumentStorage(config)
-        app.state.processor = PdfProcessor(config)
-        app.state.indexer = DocumentIndexer(config)
-        app.state.semantic_search = SemanticSearch(config)
-        app.state.rag = RAGEngine(config)
-        app.state.citation_verifier = CitationVerifier()
         try:
+            try:
+                app.state.storage = DocumentStorage(config)
+            except (OSError, ValueError):
+                raise RuntimeError(
+                    "Upload storage initialization failed. Check permissions and symlinks; "
+                    "run the development preflight for safe diagnostics."
+                ) from None
+            app.state.processor = PdfProcessor(config)
+            app.state.indexer = DocumentIndexer(config)
+            app.state.semantic_search = SemanticSearch(config)
+            app.state.rag = RAGEngine(config)
+            app.state.citation_verifier = CitationVerifier()
             with httpx.Client(
                 base_url=str(config.ollama_base_url).rstrip("/") + "/",
                 timeout=httpx.Timeout(config.ollama_timeout_seconds),

@@ -1,15 +1,20 @@
 import argparse
+import sys
 
 import uvicorn
 
-from app.core.config import get_settings
+from app.core.config import ConfigurationError, get_settings
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Start the RAGVault API")
     parser.add_argument("--reload", action="store_true", help="Reload on source changes")
     args = parser.parse_args()
-    settings = get_settings()
+    try:
+        settings = get_settings()
+    except ConfigurationError as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(2) from None
     uvicorn.run(
         "app.main:create_app",
         factory=True,

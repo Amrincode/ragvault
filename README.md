@@ -266,6 +266,58 @@ Open [the dashboard](http://localhost:5173) or [document library](http://localho
 
 The `predev` and `prebuild` scripts copy PDF.js fonts, character maps, and codecs from node_modules to ignored `frontend/public/pdfjs`. The worker and renderer are bundled locally. No CDN, hosted AI service, or model download is used.
 
+### Diagnostic-first development workflow (Stage 9.1)
+
+After the existing setup and explicit migration steps above, run from the repository root:
+
+```powershell
+.\scripts\start-dev.ps1 -CheckOnly
+.\scripts\start-dev.ps1
+```
+
+The first command only diagnoses the environment. The second diagnoses it, reuses recognized
+healthy FastAPI/Vite services, and starts missing application services on loopback. Keep its
+terminal open; Ctrl+C stops only the processes that invocation started. An invocation that
+reuses both services exits without adopting them. Stop reused services in their original
+terminals. Changes to `.env` require restarting those services yourself.
+
+Direct Python equivalents, including JSON and backend-only diagnostics:
+
+```powershell
+Set-Location backend
+.\.venv\Scripts\python.exe -m app.dev preflight --json
+.\.venv\Scripts\python.exe -m app.dev preflight --backend-only
+.\.venv\Scripts\python.exe -m app.dev start
+```
+
+On Linux, create `backend/.venv` with Python 3.12+, install `./backend[dev]` into it,
+and run `npm --prefix frontend ci`. Then use `sh scripts/start-dev.sh --check` and
+`sh scripts/start-dev.sh`, or `.venv/bin/python -m app.dev preflight` from
+`backend`. The shell wrapper's syntax and missing-venv guard were tested in a Linux
+container; a complete native Linux desktop startup was not tested.
+
+Preflight checks runtime/dependency availability, database revision/tables/pgvector,
+Ollama reachability and the configured model names, storage permissions, HTTP identity
+and occupied ports. JSON/text diagnostics omit settings values, connection strings,
+document names and personal paths. Exit 0 means required checks passed; exit 1 means
+blocked. A stopped API/frontend on a free port is expected before launch. Docker is
+optional when PostgreSQL is supplied elsewhere; PostgreSQL itself is required.
+
+The launcher never starts Docker/PostgreSQL/Ollama, installs dependencies or models,
+applies migrations, rewrites `.env`, resets data, or kills an unrelated process. Start
+Docker Desktop/Engine and the **existing** database container explicitly when needed
+(`docker compose start postgres` for an already-created container). Docker may supply
+PostgreSQL while Ollama remains a host service. Model listing does not establish that
+a model can generate an answer; the existing health endpoint remains a connectivity
+check. The launcher requires `APP_ENV=development`, local HTTP origins and matching
+frontend/API ports; production and container entry points remain separate. The manual
+commands above remain available for a library-only session without Ollama.
+
+The launcher deliberately omits auto-reload/process supervisors. Restart owned services
+after code changes, or use the earlier two-terminal reload workflow. Identity checks do
+not prove that a reused service came from this checkout or has the same configuration.
+See [Stage 9.1 verification](docs/verification-milestone-9-1.md) for evidence and limits.
+
 ## Configuration
 
 Both apps read the root `.env`; shell environment values take precedence. Existing configuration continues to work. New settings have defaults and do not require overwriting `.env`.
