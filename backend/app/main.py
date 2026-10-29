@@ -17,7 +17,7 @@ from app.api.library import router as library_router
 from app.api.search import router as search_router
 from app.core.chat_limit import APIBodyLimitMiddleware
 from app.core.config import Settings, get_settings
-from app.core.logging import configure_logging
+from app.core.logging import RequestDiagnosticsMiddleware, configure_logging
 from app.core.origin import LibraryOriginMiddleware
 from app.core.upload_limit import UploadLimitMiddleware
 from app.db.session import build_engine
@@ -111,7 +111,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_credentials=False,
         allow_methods=["GET", "POST", "PATCH", "DELETE"],
         allow_headers=["Accept", "Content-Type"],
+        expose_headers=["X-Request-ID"],
     )
+    app.add_middleware(RequestDiagnosticsMiddleware)
     app.include_router(health_router)
     app.include_router(library_router)
     app.include_router(search_router)

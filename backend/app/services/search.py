@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.core.errors import api_error
+from app.core.logging import operation_timing
 from app.models import ChunkEmbedding, Document, DocumentChunk
 from app.schemas.search import SearchHit, SearchRequest, SearchResponse
 from app.services.embeddings import EmbeddingClient, EmbeddingFailure
@@ -67,7 +68,7 @@ class SemanticSearch:
             raise api_error(
                 409, "search_busy", "Too many searches are in progress; try again shortly"
             )
-        started = monotonic()
+        started, completed = monotonic(), False
         deadline = started + self.settings.embedding_timeout_seconds
         try:
             identity = client.identity(deadline=deadline)
@@ -96,7 +97,7 @@ class SemanticSearch:
                 distance = max(0.0, min(2.0, float(values["distance"])))
                 values.update(distance=distance, similarity=1.0 - distance)
                 hits.append(SearchHit(**values))
-            return SearchResponse(
+            response = SearchResponse(
                 items=hits,
                 model=identity.name,
                 dimensions=len(vector),
@@ -104,6 +105,8 @@ class SemanticSearch:
                 elapsed_ms=round((monotonic() - started) * 1000, 2),
                 incompatible_documents=incompatible_count,
             )
+            completed = True
+            return response
         except EmbeddingFailure:
             raise api_error(
                 503,
@@ -112,6 +115,7 @@ class SemanticSearch:
             ) from None
         finally:
             self.slot.release()
+            operation_timing("search", started, completed=completed)
 
 
 def get_search(request: Request) -> SemanticSearch:

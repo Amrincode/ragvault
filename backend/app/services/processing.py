@@ -6,6 +6,7 @@ import sys
 from datetime import timedelta
 from pathlib import Path
 from threading import BoundedSemaphore
+from time import monotonic
 from uuid import UUID, uuid4
 
 from fastapi import Request
@@ -16,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.core.errors import api_error
+from app.core.logging import operation_timing
 from app.models import Document, DocumentChunk
 from app.models.library import utc_now
 from app.services.library import require_document
@@ -113,6 +115,7 @@ def process_document(
         raise api_error(409, "processor_busy", "Another PDF is being processed; try again shortly")
     token = uuid4()
     claimed = False
+    started, completed = monotonic(), False
     try:
         now = utc_now()
         # Stale recovery accounts for the parser timeout plus transaction/cleanup grace.
@@ -177,6 +180,7 @@ def process_document(
         document.processed_at = utc_now()
         document.processing_token = None
         session.commit()
+        completed = True
         return document
     except (ProcessingFailure, SQLAlchemyError, OSError):
         session.rollback()
@@ -207,3 +211,4 @@ def process_document(
         ) from None
     finally:
         processor.slot.release()
+        operation_timing("processing", started, completed=completed)

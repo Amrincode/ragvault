@@ -390,6 +390,18 @@ SQL and files cannot form one atomic transaction. Hard crashes, ambiguous commit
 
 PDF validation is not malware scanning, content sanitization, or proof of safety. Files remain untrusted; the parser subprocess has a timeout but no OS memory/CPU sandbox or reduced filesystem privileges. Upload storage is not encrypted by the app. Preview is one page at a time with a bounded canvas; original-file streaming does not offer range/resume support. Authentication, OCR and lexical/full-text search are not implemented. Scoped persistent conversations are available. Semantic retrieval and document answers are available for explicitly indexed chunks; answers can hallucinate, and source/wording checks do not establish factual truth or complete relevance. Extraction has additional timeout, page/text/output/concurrency limits; the Linux child has a 1 GiB address-space ceiling. Windows transient page memory is not hard-capped. See the processing and chat architectures for details.
 
+## Reliability operations (Stage 9.3)
+
+Requests now receive generated correlation IDs with privacy-safe route/timing logs.
+Processing and indexing add elapsed diagnostics; existing retrieval, generation and
+citation timings are preserved. See [local operations and paired recovery](docs/operations-recovery.md)
+for the explicit PostgreSQL + original-PDF backup procedure, isolated restore steps,
+service recovery, supported deployment boundary and v1.0 operational acceptance criteria.
+Backups are sensitive, local, opt-in and Git-ignored. No automatic/in-place restore is provided.
+See [Stage 9.3 verification](docs/verification-milestone-9-3.md) for actual evidence and limitations.
+Existing answer-quality limits and [unresolved container advisories](docs/verification-milestone-9-2.md)
+remain; this local-first single-user application is not approved for unrestricted internet exposure.
+
 ## Tests and quality checks
 
 Backend unit tests use temporary SQLite databases and upload directories. Explicit PostgreSQL vector tests use isolated disposable schemas with mocked embeddings. Tests never process user uploads. Direct `create_all` exists only in isolated fixtures. Live verification separately checks the Alembic-managed PostgreSQL schema. To run real pgvector tests after migration, set `$env:RAGVAULT_TEST_POSTGRES="1"` and run `python -m pytest -m postgres`; remove that variable afterward. Ollama remains mocked in automated tests. The existing Starlette TestClient HTTPX deprecation warning is recorded in the verification report.

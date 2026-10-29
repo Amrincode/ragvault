@@ -45,6 +45,9 @@ data/
 *.db
 *.sqlite*
 pgdata/
+backups/
+*.ragvault-backup/
+*.dump
 
 # Editors and OS files
 .idea/

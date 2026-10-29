@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.core.errors import api_error
+from app.core.logging import stage_timing
 from app.schemas.chat import ChatRequest, ChatResponse, ChatTimings, CitationVerification
 from app.schemas.search import SearchRequest
 from app.services.citations import CitationVerifier, verify_claims
@@ -146,7 +147,7 @@ class RAGEngine:
                         "a usable answer. "
                         "Review the retrieved excerpts or ask a more specific question."
                     )
-            return ChatResponse(
+            response = ChatResponse(
                 status=status,
                 answer=answer,
                 sources=sources,
@@ -170,6 +171,13 @@ class RAGEngine:
                 if status in {"unreliable", "insufficient_evidence"}
                 else [],
             )
+            for operation, duration in (
+                ("retrieval", retrieval_ms),
+                ("generation", generation_ms),
+                ("citation_validation", verification_ms),
+            ):
+                stage_timing(operation, duration)
+            return response
         except LLMFailure as exc:
             code = exc.code if exc.code in LLM_ERRORS else "generation_failed"
             http_status, message = LLM_ERRORS[code]

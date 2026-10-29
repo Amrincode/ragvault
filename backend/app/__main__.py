@@ -22,6 +22,8 @@ def main() -> None:
         port=settings.backend_port,
         reload=args.reload,
         log_level=settings.log_level.lower(),
+        # Sanitized request diagnostics replace access lines containing raw URLs/queries.
+        access_log=False,
     )
 
 

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.core.errors import api_error
+from app.core.logging import operation_timing
 from app.models import ChunkEmbedding, Document, DocumentChunk
 from app.models.library import utc_now
 from app.services.embeddings import EmbeddingClient, EmbeddingFailure
@@ -35,7 +36,8 @@ class DocumentIndexer:
             raise api_error(409, "indexer_busy", "Another document is indexing; try again shortly")
         token = uuid4()
         claimed = False
-        deadline = monotonic() + self.settings.indexing_timeout_seconds
+        started, completed = monotonic(), False
+        deadline = started + self.settings.indexing_timeout_seconds
         try:
             now = utc_now()
             cutoff = now - timedelta(seconds=self.settings.indexing_timeout_seconds + 60)
@@ -137,6 +139,7 @@ class DocumentIndexer:
             document.embedding_dimensions = dimensions
             document.embedding_fingerprint = fingerprint
             session.commit()
+            completed = True
             return document
         except (EmbeddingFailure, SQLAlchemyError):
             session.rollback()
@@ -155,6 +158,7 @@ class DocumentIndexer:
             raise api_error(503, "indexing_failed", INDEX_ERROR) from None
         finally:
             self.slot.release()
+            operation_timing("indexing", started, completed=completed)
 
 
 def get_indexer(request: Request) -> DocumentIndexer:
