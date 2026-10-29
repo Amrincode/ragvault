@@ -4,7 +4,6 @@ from contextlib import ExitStack, asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, Request
-from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -16,7 +15,7 @@ from app.api.conversations import router as conversation_router
 from app.api.health import router as health_router
 from app.api.library import router as library_router
 from app.api.search import router as search_router
-from app.core.chat_limit import ChatBodyLimitMiddleware
+from app.core.chat_limit import APIBodyLimitMiddleware
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
 from app.core.origin import LibraryOriginMiddleware
@@ -88,7 +87,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(title="RAGVault API", version="0.7.0", lifespan=lifespan)
     app.add_middleware(UploadLimitMiddleware, max_bytes=config.max_upload_bytes)
-    app.add_middleware(ChatBodyLimitMiddleware)
+    app.add_middleware(APIBodyLimitMiddleware)
     app.add_middleware(
         LibraryOriginMiddleware,
         allowed_origins=[
@@ -145,7 +144,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     }
                 },
             )
-        return await request_validation_exception_handler(request, exc)
+        # Library metadata, search text and malformed IDs can also contain private
+        # input or invalid Unicode. Do not echo Pydantic inputs or exception context.
+        return JSONResponse(
+            status_code=422,
+            content={
+                "detail": {
+                    "code": "invalid_request",
+                    "message": "Check request fields, filenames, UUIDs and pagination limits.",
+                }
+            },
+        )
 
     @app.exception_handler(SQLAlchemyError)
     async def database_failure(request: Request, exc: SQLAlchemyError) -> JSONResponse:

@@ -3,7 +3,7 @@ from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 
-class ChatBodyLimitMiddleware:
+class APIBodyLimitMiddleware:
     """Bound JSON before parsing, including unknown fields and chunked requests."""
 
     def __init__(self, app: ASGIApp):
@@ -11,9 +11,12 @@ class ChatBodyLimitMiddleware:
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         path = scope.get("path", "")
-        if scope["type"] != "http" or not (
-            path == "/api/chat" or path.startswith("/api/conversations")
-        ):
+        multipart_upload = (
+            scope.get("method") == "POST"
+            and path.startswith("/api/collections/")
+            and path.endswith("/documents")
+        )
+        if scope["type"] != "http" or not path.startswith("/api/") or multipart_upload:
             await self.app(scope, receive, send)
             return
         limit = 16384
@@ -22,7 +25,11 @@ class ChatBodyLimitMiddleware:
             size = int(headers.get(b"content-length", b"0"))
         except ValueError:
             size = limit + 1
-        detail = {"code": "chat_body_too_large", "message": "Chat request exceeds 16 KiB"}
+        chat = path == "/api/chat" or path.startswith("/api/conversations")
+        detail = {
+            "code": "chat_body_too_large" if chat else "request_body_too_large",
+            "message": "Chat request exceeds 16 KiB" if chat else "API request exceeds 16 KiB",
+        }
         if size > limit:
             await JSONResponse({"detail": detail}, status_code=413)(scope, receive, send)
             return

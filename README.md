@@ -12,7 +12,7 @@ A local-first document intelligence portfolio project, built in explicit milesto
 | AI chat | Persistent conversations with fixed scopes, bounded follow-ups, unsaved questions, citations and explicit partial/withheld states |
 | PDF reader | Bounded single-page rendering, direct page entry, session zoom, fit width and cancellation/error recovery |
 
-**Single user. Local machine only. No authentication.** Do not expose this service publicly. This portfolio project is not presented as production-ready; Milestone 9 has not started. Messages and cited excerpts are private local database data, not encrypted conversation storage. Citation wording checks do not guarantee truth, relevance or completeness. Dedicated whole-document summarization and OCR are not implemented; model selection is planned for a future milestone.
+**Single user. Local machine only. No authentication.** Do not expose this service publicly. This portfolio project is not presented as production-ready. Stage 9.1 adds safe development startup; Stage 9.2 hardening and its remaining risks are described in the [security assessment](docs/verification-milestone-9-2.md). Messages and cited excerpts are private local database data, not encrypted conversation storage. Citation wording checks do not guarantee truth, relevance or completeness. Dedicated whole-document summarization and OCR are not implemented; model selection is planned for a future milestone.
 
 ![Dashboard with synthetic data](docs/screenshots/stage-8-6/dashboard-light.jpg)
 
@@ -365,7 +365,7 @@ Use `http://localhost:5173`, matching CORS; `127.0.0.1` is a different origin. B
 | GET | `/api/documents/{id}/file?download=true` | Download the original |
 | DELETE | `/api/documents/{id}` | Remove metadata and stored PDF; 204 |
 
-Common errors: 404 missing collection/document/file, 409 duplicate content/name or nonempty collection, 413 oversized upload, 415 unsupported filename/type, 422 invalid signature/PDF/encryption/pages/validation, 403 unapproved browser write origin, and 503 dependency/storage failure. Library operation errors include safe `detail.code` and `detail.message`; standard Pydantic field-validation errors retain FastAPI's validation format.
+Common errors: 404 missing collection/document/file, 409 duplicate content/name, nonempty collection or busy PDF validator, 413 oversized request/upload, 415 unsupported filename/type, 422 invalid signature/PDF/encryption/pages/validation, 403 unapproved browser write origin, and 503 dependency/storage failure. Validation and operation errors use safe `detail.code` and `detail.message`; invalid input and internal exception details are not reflected.
 
 Verify services without exposing settings:
 
@@ -379,6 +379,10 @@ Healthy output has application `ok`, database `connected`, and Ollama `connected
 ## Storage, consistency, and security
 
 Original PDFs are stored as `<uuid hex>.pdf`, with `.tmp` staging and `.trash` quarantine directories below the configured root. The client never supplies an internal storage path. There is no static directory exposing arbitrary files. Controlled serving sends safe disposition headers, PDF MIME, nosniff, no-store, and a frame-ancestor policy. PDF.js renders pages without annotation, scripting, or XFA layers; advanced interactive PDF features remain available only in the downloaded original.
+
+Non-upload API bodies are bounded to 16 KiB before/during parsing, including unknown fields and chunked requests. Uploads retain the separate PDF/multipart limits above. Each API process admits one PDF-validation subprocess; a concurrent validation returns retryable `409 validator_busy`. This is an availability control, not authentication or a global rate limit. Parser timeouts and other processing/index/chat admission limits remain in place.
+
+Storage operations recheck the root, staging and trash directories and reject detected symlink/junction redirection. New POSIX storage directories/files use `0700`/`0600`; existing permissions and Windows ACLs are unchanged. The storage owner must remain trusted: pathname checks cannot eliminate races by an actor controlling those directories. A different local process can still access the unauthenticated API or forge allowed headers. Use a trusted single-user host, loopback bindings and private filesystem permissions.
 
 Upload failures roll back metadata and clean up staged/promoted files. Duplicate constraints are checked before promotion. Deletion quarantines a file, commits metadata removal, then unlinks it; a failed database deletion restores the original file. Collection locking and a restricted foreign key prevent unsafe collection removal. Logs identify safe error classes rather than leaking connection strings or raw database exceptions.
 

@@ -191,33 +191,37 @@ def serve_document(
         source = storage.open_pdf(document.storage_key)
     except FileNotFoundError:
         raise api_error(404, "file_not_found", "Stored PDF is unavailable") from None
-    size = os.fstat(source.fileno()).st_size
+    try:
+        size = os.fstat(source.fileno()).st_size
 
-    def chunks() -> Iterator[bytes]:
-        try:
-            while chunk := source.read(1024 * 1024):
-                yield chunk
-        finally:
-            source.close()
+        def chunks() -> Iterator[bytes]:
+            try:
+                while chunk := source.read(1024 * 1024):
+                    yield chunk
+            finally:
+                source.close()
 
-    disposition = "attachment" if download else "inline"
-    return _PDFStreamingResponse(
-        chunks(),
-        source,
-        headers={
-            "Content-Length": str(size),
-            "Content-Disposition": (
-                f'{disposition}; filename="document.pdf"; '
-                f"filename*=UTF-8''{quote(document.filename, safe='')}"
-            ),
-            "Cache-Control": "private, no-store",
-            "X-Content-Type-Options": "nosniff",
-            "Content-Security-Policy": (
-                "default-src 'none'; frame-ancestors 'self' "
-                f"{request.app.state.settings.cors_origin}"
-            ),
-        },
-    )
+        disposition = "attachment" if download else "inline"
+        return _PDFStreamingResponse(
+            chunks(),
+            source,
+            headers={
+                "Content-Length": str(size),
+                "Content-Disposition": (
+                    f'{disposition}; filename="document.pdf"; '
+                    f"filename*=UTF-8''{quote(document.filename, safe='')}"
+                ),
+                "Cache-Control": "private, no-store",
+                "X-Content-Type-Options": "nosniff",
+                "Content-Security-Policy": (
+                    "default-src 'none'; frame-ancestors 'self' "
+                    f"{request.app.state.settings.cors_origin}"
+                ),
+            },
+        )
+    except BaseException:
+        source.close()
+        raise
 
 
 @router.delete("/documents/{document_id}", status_code=204)

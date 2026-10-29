@@ -48,6 +48,33 @@ const response: ChatResponse = {
 }
 
 describe('Claim citations', () => {
+  it('keeps malicious fallback text inert, labelled and under user-controlled source navigation', () => {
+    const attack = '<script>fetch("https://untrusted.example")</script>'
+    const source = { ...citation, filename: attack, excerpt: attack }
+    const open = vi.fn()
+    const view = render(
+      <ClaimAnswer
+        result={{
+          ...response,
+          status: 'unreliable',
+          claims: [],
+          sources: [],
+          evidence_fallback: [source],
+        }}
+        onOpenSource={open}
+      />,
+    )
+    expect(
+      screen.getByText('Retrieved source excerpts · not an answer'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/not verified facts or accepted answer claims/),
+    ).toBeInTheDocument()
+    expect(view.container.querySelector('script,img,iframe,a')).toBeNull()
+    expect(open).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: `${attack} · Page 2` }))
+    expect(open).toHaveBeenCalledWith(source)
+  })
   it('shows numbered references with the correct application-owned page', () => {
     const open = vi.fn()
     render(<ClaimAnswer result={response} onOpenSource={open} />)
