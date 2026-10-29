@@ -48,6 +48,7 @@ pgdata/
 backups/
 *.ragvault-backup/
 *.dump
+*.ragvault-eval/
 
 # Editors and OS files
 .idea/

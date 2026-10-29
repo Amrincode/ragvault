@@ -422,6 +422,12 @@ npm.cmd run build
 
 Expect passing tests, no lint/type errors, compliant formatting, consistent Python dependencies, and a Vite `dist/` build including local PDF.js assets. GitHub Actions runs these checks, real PostgreSQL migration/schema checks, and container builds after push; remote execution is not implied by local success.
 
+Stage 10.1 adds an explicit [synthetic AI evaluation runner](backend/evaluation/README.md)
+with a versioned corpus, independent answer keys and recorded live-model baseline.
+It uses disposable PostgreSQL/upload storage and never runs as part of normal startup
+or default tests. See [the Stage 10.1 verification report](docs/verification-milestone-10-1.md)
+for measured failures and limitations; a citation match is not factual verification.
+
 ## Optional Docker application mode
 
 Stop native servers before publishing the same ports. Keep existing `.env`, PostgreSQL volume, and upload directory. The backend's nonroot user needs write access to the mounted upload directory. Native and Docker application modes should not write the same library concurrently.
